@@ -9,3 +9,7 @@ cppcheck-*
 # As this file contains the full path my local build directory
 # I'm guessing that it should not be committed to git.
 .kdev4
+
+# Working files associated with Tim's IDEs
+debug
+.vscode
