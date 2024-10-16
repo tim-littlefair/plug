@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 
 #define INSTANTIATE_PROTOCOL_FACTORY_HERE
 #include "com/MustangProtocols.h"
@@ -287,26 +288,46 @@ namespace plug::com
 
     std::vector<uint8_t> Mustang::extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label) {
         std::vector<uint8_t> retval = std::vector<uint8_t>();
-        for (size_t i=1; i<packets.size(); ++i)
+        for (size_t i=2; i<packets.size(); ++i)
         {
             PacketRawType p = packets.at(i);
-            int json_offset;
+            int json_start_offset =3;
+            int json_length = p[2];
+
+            // p[0] is always 0
+            // p[1] is frame type
+            // p[2] is signficant data in frame (after p[2])
+
             switch (p[1])
             {
-                case 0x35:
-                case 0x33:
-                    json_offset = 12;
+                case 0x33:  // first frame of response
+                    // p[3] appears to hold number of bytes to be consumed
+                    // before JSON starts
+                    json_start_offset+= p[3] + 1;
+                    json_length -= ( p[3] + 1 ) ;
                     break;
-                case 0x34:
-                    json_offset = 3;
+
+                case 0x34: // any frame other than first and last
+                    json_start_offset = 3;
                     break;
+
+
+                case 0x35: // last frame of response
+                    json_start_offset = 3;
+                    json_length -= 1; // terminating 0x00
+                    break;
+
                 default:
-                    json_offset=64;
+                    json_start_offset = 3;
+                    json_length=0;
                     continue;
             }
+
+            std::cout << "i=" << i << " p1[1:2]=" << static_cast<unsigned int>(p[1]) << " " << static_cast<unsigned int>(p[2]) << " " << json_start_offset << " " << json_length << std::endl;
+
             std::copy(
-                p.cbegin() + json_offset,
-                p.cend(),
+                p.cbegin() + json_start_offset,
+                p.cbegin() + json_start_offset + json_length,
                 std::back_inserter(retval)
             );
         }
