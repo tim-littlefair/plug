@@ -319,6 +319,7 @@ namespace plug::com
 
                 case 0x35: // last frame of response
                     json_start_offset = 3;
+                    json_length -= 1;
                     break;
 
                 default:
@@ -343,13 +344,14 @@ namespace plug::com
         const char* jsonNullTerminatedCharString = reinterpret_cast<const char*>(&(retval.at(0)));
 
 
-        QByteArray jsonQByteArray(jsonNullTerminatedCharString, retval.size()-1);
+        QByteArray jsonQByteArray(jsonNullTerminatedCharString,retval.size()-1);
         QJsonParseError parseError;
         QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonQByteArray, &parseError);
         if(jsonDocument.isNull())
         {
-            json_dump_stream << "JSON parse error at offset " << parseError.offset  << std::endl << std::endl;
-            json_dump_stream.write(reinterpret_cast<const char*>(&(retval.at(0))), retval.size()-1);
+            json_dump_stream << "JSON parse error of type " << parseError.error
+                             << " at offset " << parseError.offset  << std::endl << std::endl;
+            json_dump_stream.write(jsonNullTerminatedCharString, retval.size()-1);
         }
         else
         {
