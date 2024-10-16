@@ -737,5 +737,4 @@ namespace plug::com
             Packet<EmptyPayload>{header2, EmptyPayload{}},
         }};
     }
-
 }

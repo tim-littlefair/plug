@@ -11,5 +11,6 @@ cppcheck-*
 .kdev4
 
 # Working files associated with Tim's IDEs
-debug
+debug/*
 .vscode
+

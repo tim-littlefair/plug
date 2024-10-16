@@ -24,6 +24,8 @@
 #include "SignalChain.h"
 #include "DeviceModel.h"
 #include "com/Connection.h"
+#include "com/Packet.h"
+
 #include <string_view>
 #include <vector>
 #include <memory>
@@ -56,11 +58,11 @@ namespace plug::com
 
         Mustang& operator=(const Mustang&) = delete;
 
+        static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label);
 
     private:
         InitialData loadData();
         void initializeAmp();
-
         const DeviceModel model;
         const std::shared_ptr<Connection> conn;
     };

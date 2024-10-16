@@ -24,7 +24,9 @@
 #include "com/PacketSerializer.h"
 #include "com/CommunicationException.h"
 #include "com/Packet.h"
+
 #include <algorithm>
+#include <fstream>
 
 namespace plug::com
 {
@@ -45,9 +47,11 @@ namespace plug::com
 
             case DeviceModel::Category::MustangV3_USB:
             {
+
                 const auto name = decodeNameFromData(fromRawData<NamePayload>(data[0]));
                 const amp_settings amp{};
                 const std::vector<fx_pedal_settings> effects;
+
                 return SignalChain{name, amp, effects};
             }
 
@@ -64,10 +68,10 @@ namespace plug::com
     }
 
 
-    void sendCommand(Connection& conn, const PacketRawType& packet)
+    std::vector<std::uint8_t>  sendCommand(Connection& conn, const PacketRawType& packet)
     {
         conn.send(packet);
-        receivePacket(conn);
+        return receivePacket(conn);
     }
 
     void sendApplyCommand(Connection& conn)
@@ -177,6 +181,22 @@ namespace plug::com
     {
         std::vector<std::array<std::uint8_t, 64>> recieved_data;
 
+        if (model.category() == DeviceModel::Category::MustangV3_USB)
+        {
+            // For V3_USB devices, the responses to the init command contain
+            // the start of the first JSON bundle received, so we defer sending
+            // this command until recieved_data exists to store the responses
+            const auto packets = serializeInitCommand_V3_USB();
+            for (auto pPacket = packets.cbegin(); pPacket != packets.cend(); ++pPacket)
+            {
+                const auto recvData = sendCommand(*conn, pPacket->getBytes());
+                PacketRawType p{};
+                std::copy(recvData.cbegin(), recvData.cend(), p.begin());
+                recieved_data.push_back(p);
+            }
+        }
+
+
         const auto loadCommand = serializeLoadCommand();
         auto recieved = conn->send(loadCommand.getBytes());
 
@@ -189,18 +209,52 @@ namespace plug::com
             recieved_data.push_back(p);
         }
 
-        const std::size_t numPresetPackets = model.numberOfPresets() > 0 ? (model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
-        std::vector<Packet<NamePayload>> presetListData;
-        presetListData.reserve(numPresetPackets);
-        std::transform(recieved_data.cbegin(), std::next(recieved_data.cbegin(), numPresetPackets), std::back_inserter(presetListData), [](const auto& p)
-                       {
-            Packet<NamePayload> packet{};
-            packet.fromBytes(p);
-            return packet; });
-        auto presetNames = decodePresetListFromData(presetListData);
+        switch (model.category())
+        {
+            case DeviceModel::Category::MustangV1:
+            case DeviceModel::Category::MustangV2:
+            {
+                const std::size_t numPresetPackets = model.numberOfPresets() > 0 ? (model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
+                std::vector<Packet<NamePayload>> presetListData;
+                presetListData.reserve(numPresetPackets);
+                std::transform(recieved_data.cbegin(), std::next(recieved_data.cbegin(), numPresetPackets), std::back_inserter(presetListData), [](const auto& p)
+                            {
+                    Packet<NamePayload> packet{};
+                    packet.fromBytes(p);
+                    return packet; });
+                auto presetNames = decodePresetListFromData(presetListData);
 
+                std::array<PacketRawType, 7> presetData{{}};
+                std::copy(std::next(recieved_data.cbegin(), numPresetPackets), std::next(recieved_data.cbegin(), numPresetPackets + 7), presetData.begin());
+            }
+            break;
+
+            case DeviceModel::Category::MustangV3_USB:
+            {
+                std::vector<uint8_t> jsonData = Mustang::extractResponsePayload_V3_USB(recieved_data, std::string("response1"));
+
+                std::vector<Packet<NamePayload>> presetListData;
+                presetListData.reserve(0);
+                auto presetNames = decodePresetListFromData(presetListData);
+                std::array<PacketRawType, 7> presetData{{}};
+
+                return {decode_data(presetData, model), presetNames};
+            }
+            break;
+
+            default:
+                std::vector<Packet<NamePayload>> presetListData;
+                presetListData.reserve(0);
+                auto presetNames = decodePresetListFromData(presetListData);
+                std::array<PacketRawType, 7> presetData{{}};
+
+                return {decode_data(presetData, model), presetNames};
+        }
+
+        std::vector<Packet<NamePayload>> presetListData;
+        presetListData.reserve(0);
+        auto presetNames = decodePresetListFromData(presetListData);
         std::array<PacketRawType, 7> presetData{{}};
-        std::copy(std::next(recieved_data.cbegin(), numPresetPackets), std::next(recieved_data.cbegin(), numPresetPackets + 7), presetData.begin());
 
         return {decode_data(presetData, model), presetNames};
     }
@@ -209,15 +263,52 @@ namespace plug::com
     {
         if (model.category() == DeviceModel::Category::MustangV3_USB)
         {
-            const auto packets = serializeInitCommand_V3_USB();
-            std::for_each(packets.cbegin(), packets.cend(), [this](const auto& p)
-                          { sendCommand(*conn, p.getBytes()); });
+            // defer the init command until loadData is running because
+            // loadData needs to see the responses
         }
         else
         {
             const auto packets = serializeInitCommand();
             std::for_each(packets.cbegin(), packets.cend(), [this](const auto& p)
-                          { sendCommand(*conn, p.getBytes()); });
+                          {sendCommand(*conn, p.getBytes()); });
         }
     }
+
+    std::vector<uint8_t> Mustang::extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label) {
+        std::vector<uint8_t> retval = std::vector<uint8_t>();
+        for (size_t i=1; i<packets.size(); ++i)
+        {
+            PacketRawType p = packets.at(i);
+            int json_offset;
+            switch (p[1])
+            {
+                case 0x35:
+                case 0x33:
+                    json_offset = 12;
+                    break;
+                case 0x34:
+                    json_offset = 3;
+                    break;
+                default:
+                    json_offset=64;
+                    continue;
+            }
+            std::copy(
+                p.cbegin() + json_offset,
+                p.cend(),
+                std::back_inserter(retval)
+            );
+        }
+#ifndef NDEBUG
+        std::string json_dump_fname = label;
+        json_dump_fname.append(".json");
+        std::ofstream json_dump_stream(json_dump_fname);
+        json_dump_stream.write(reinterpret_cast<const char*>(&(retval.at(0))), retval.size());
+        json_dump_stream.flush();
+        json_dump_stream.close();
+#endif
+
+        return retval;
+    }
+
 }
