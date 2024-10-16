@@ -28,6 +28,8 @@
 #include <algorithm>
 #include <fstream>
 
+#include "MustangProtocols.hpp"
+
 namespace plug::com
 {
     SignalChain decode_data(const std::array<PacketRawType, 7>& data, DeviceModel model)
