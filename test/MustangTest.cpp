@@ -28,6 +28,7 @@
 #include <array>
 #include <gmock/gmock.h>
 
+#include "com/MustangProtocols.h"
 
 namespace plug::test
 {
@@ -75,9 +76,10 @@ namespace plug::test
 
     TEST_F(MustangTest, startInitializesDevice)
     {
-        const auto [initPacket1, initPacket2] = serializeInitCommand();
-        const auto initCmd1 = initPacket1.getBytes();
-        const auto initCmd2 = initPacket2.getBytes();
+        const auto activeProtocol = MustangProtocolBase::factory(m->getDeviceModel());
+        const auto initPacketVector = activeProtocol->serializeInitCommand();
+        const auto initCmd1 = initPacketVector[0].getBytes();
+        const auto initCmd2 = initPacketVector[1].getBytes();
 
         InSequence s;
         EXPECT_CALL(*conn, isOpen()).WillOnce(Return(true));
@@ -117,9 +119,10 @@ namespace plug::test
 
     TEST_F(MustangTest, startRequestsCurrentPresetName)
     {
-        const auto [initPacket1, initPacket2] = serializeInitCommand();
-        const auto initCmd1 = initPacket1.getBytes();
-        const auto initCmd2 = initPacket2.getBytes();
+        const auto activeProtocol = MustangProtocolBase::factory(m->getDeviceModel());
+        const auto initPacketVector = activeProtocol->serializeInitCommand();
+        const auto initCmd1 = initPacketVector[0].getBytes();
+        const auto initCmd2 = initPacketVector[1].getBytes();
 
         InSequence s;
         EXPECT_CALL(*conn, isOpen()).WillOnce(Return(true));
@@ -164,9 +167,11 @@ namespace plug::test
                                    true, 17};
         const auto recvData = asBuffer(serializeAmpSettings(amp).getBytes());
         const auto extendedData = asBuffer(serializeAmpSettingsUsbGain(amp).getBytes());
-        const auto [initPacket1, initPacket2] = serializeInitCommand();
-        const auto initCmd1 = initPacket1.getBytes();
-        const auto initCmd2 = initPacket2.getBytes();
+
+        const auto activeProtocol = MustangProtocolBase::factory(m->getDeviceModel());
+        const auto initPacketVector = activeProtocol->serializeInitCommand();
+        const auto initCmd1 = initPacketVector[0].getBytes();
+        const auto initCmd2 = initPacketVector[1].getBytes();
 
         InSequence s;
         EXPECT_CALL(*conn, isOpen()).WillOnce(Return(true));
@@ -211,9 +216,11 @@ namespace plug::test
         const auto recvData1 = asBuffer(serializeEffectSettings(e1).getBytes());
         const auto recvData2 = asBuffer(serializeEffectSettings(e2).getBytes());
         const auto recvData3 = asBuffer(serializeEffectSettings(e3).getBytes());
-        const auto [initPacket1, initPacket2] = serializeInitCommand();
-        const auto initCmd1 = initPacket1.getBytes();
-        const auto initCmd2 = initPacket2.getBytes();
+
+        const auto activeProtocol = MustangProtocolBase::factory(m->getDeviceModel());
+        const auto initPacketVector = activeProtocol->serializeInitCommand();
+        const auto initCmd1 = initPacketVector[0].getBytes();
+        const auto initCmd2 = initPacketVector[1].getBytes();
 
 
         InSequence s;
@@ -252,9 +259,11 @@ namespace plug::test
 
     TEST_F(MustangTest, startRequestsAmpPresetList)
     {
-        const auto [initPacket1, initPacket2] = serializeInitCommand();
-        const auto initCmd1 = initPacket1.getBytes();
-        const auto initCmd2 = initPacket2.getBytes();
+        const auto activeProtocol = MustangProtocolBase::factory(m->getDeviceModel());
+        const auto initPacketVector = activeProtocol->serializeInitCommand();
+        const auto initCmd1 = initPacketVector[0].getBytes();
+        const auto initCmd2 = initPacketVector[1].getBytes();
+
         const auto recvData0 = asBuffer(serializeName(0, "abc").getBytes());
         const auto recvData1 = asBuffer(serializeName(0, "def").getBytes());
         const auto recvData2 = asBuffer(serializeName(0, "ghi").getBytes());
@@ -306,9 +315,10 @@ namespace plug::test
 
     TEST_F(MustangTest, startUsesFullInitialTransmissionSizeIfOverThreshold)
     {
-        const auto [initPacket1, initPacket2] = serializeInitCommand();
-        const auto initCmd1 = initPacket1.getBytes();
-        const auto initCmd2 = initPacket2.getBytes();
+        const auto activeProtocol = MustangProtocolBase::factory(m->getDeviceModel());
+        const auto initPacketVector = activeProtocol->serializeInitCommand();
+        const auto initCmd1 = initPacketVector[0].getBytes();
+        const auto initCmd2 = initPacketVector[1].getBytes();
 
         InSequence s;
         EXPECT_CALL(*conn, isOpen()).WillOnce(Return(true));

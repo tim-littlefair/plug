@@ -28,10 +28,14 @@
 #include <algorithm>
 #include <fstream>
 
-#include "MustangProtocols.hpp"
+#define INSTANTIATE_PROTOCOL_FACTORY_HERE
+#include "com/MustangProtocols.h"
+#undef INSTANTIATE_PROTOCOL_FACTORY_HERE
 
 namespace plug::com
 {
+    static MustangProtocolBase *activeProtocol = NULL;
+
     SignalChain decode_data(const std::array<PacketRawType, 7>& data, DeviceModel model)
     {
         switch (model.category())
@@ -105,6 +109,11 @@ namespace plug::com
     Mustang::Mustang(DeviceModel deviceModel, std::shared_ptr<Connection> connection)
         : model(deviceModel), conn(connection)
     {
+        activeProtocol = MustangProtocolBase::factory(deviceModel);
+        if (activeProtocol == NULL)
+        {
+            throw CommunicationException{"Failed to select protocol version"};
+        }
     }
 
     InitialData Mustang::start_amp()
@@ -188,7 +197,7 @@ namespace plug::com
             // For V3_USB devices, the responses to the init command contain
             // the start of the first JSON bundle received, so we defer sending
             // this command until recieved_data exists to store the responses
-            const auto packets = serializeInitCommand_V3_USB();
+            const auto packets = activeProtocol->serializeInitCommand();
             for (auto pPacket = packets.cbegin(); pPacket != packets.cend(); ++pPacket)
             {
                 const auto recvData = sendCommand(*conn, pPacket->getBytes());
@@ -270,7 +279,7 @@ namespace plug::com
         }
         else
         {
-            const auto packets = serializeInitCommand();
+            const auto packets = activeProtocol->serializeInitCommand();
             std::for_each(packets.cbegin(), packets.cend(), [this](const auto& p)
                           {sendCommand(*conn, p.getBytes()); });
         }

@@ -24,6 +24,7 @@
 #include "helper/MustangConstants.h"
 #include <gmock/gmock.h>
 
+#include <com/MustangProtocols.h>
 
 namespace plug::test
 {
@@ -31,15 +32,24 @@ namespace plug::test
     using namespace testing;
     using namespace test::matcher;
 
-    class PacketSerializerTest : public testing::Test
+    class MustangProtocolsTest : public testing::Test
     {
+        MustangProtocolBase *v12Protocol;
+        MustangProtocolBase *v3Protocol;
     protected:
         void SetUp() override
         {
+            DeviceModel v1Model = DeviceModel{"Test Device", DeviceModel::Category::MustangV1, 100};
+            DeviceModel v3Model = DeviceModel{"Test Device", DeviceModel::Category::MustangV3, 100};
+            v12Protocol = MustangProtocolBase::factory(v1Model);
+            v3Protocol = MustangProtocolBase::factory(v3Model);
+
         }
 
         void TearDown() override
         {
+            delete v12Protocol;
+            delete v3Protocol;
         }
 
         [[nodiscard]] std::array<PacketRawType, 7> filledPackage(std::uint8_t value) const
@@ -106,8 +116,7 @@ namespace plug::test
         const Packet<AmpPayload> emptyAmpPayload{};
     };
 
-/*
-     TEST_F(PacketSerializerTest, serializeInitCommand)
+     TEST_F(PacketSerializerTest, serializeInitCommand_V1V2)
     {
         PacketRawType packet1{};
         packet1[1] = 0xc3;
@@ -115,13 +124,13 @@ namespace plug::test
         packet2[0] = 0x1a;
         packet2[1] = 0xc1;
 
-        const auto packets = serializeInitCommand();
+        const auto packets = v12Protocol->serializeInitCommand();
         EXPECT_THAT(packets, SizeIs(2));
         EXPECT_THAT(packets[0].getBytes(), ContainerEq(packet1));
         EXPECT_THAT(packets[1].getBytes(), ContainerEq(packet2));
     }
-*/
 
+/*
     TEST_F(PacketSerializerTest, serializeApplyCommand)
     {
         PacketRawType expected{};
@@ -1160,4 +1169,5 @@ namespace plug::test
         EXPECT_THAT(result[3].slot.id(), Eq(7));
         EXPECT_THAT(result[3].slot.isFxLoop(), IsTrue());
     }
+*/
 }
