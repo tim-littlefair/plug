@@ -25,6 +25,11 @@
 #include "com/CommunicationException.h"
 #include "com/Packet.h"
 
+#include <qt6/QtCore/QJsonParseError>
+#include <qt6/QtCore/QByteArray>
+#include <qt6/QtCore/QJsonParseError>
+#include <qt6/QtCore/QString>
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
@@ -314,7 +319,6 @@ namespace plug::com
 
                 case 0x35: // last frame of response
                     json_start_offset = 3;
-                    json_length -= 1; // terminating 0x00
                     break;
 
                 default:
@@ -335,7 +339,23 @@ namespace plug::com
         std::string json_dump_fname = label;
         json_dump_fname.append(".json");
         std::ofstream json_dump_stream(json_dump_fname);
-        json_dump_stream.write(reinterpret_cast<const char*>(&(retval.at(0))), retval.size());
+
+        const char* jsonNullTerminatedCharString = reinterpret_cast<const char*>(&(retval.at(0)));
+
+
+        QByteArray jsonQByteArray(jsonNullTerminatedCharString, retval.size()-1);
+        QJsonParseError parseError;
+        QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonQByteArray, &parseError);
+        if(jsonDocument.isNull())
+        {
+            json_dump_stream << "JSON parse error at offset " << parseError.offset  << std::endl << std::endl;
+            json_dump_stream.write(reinterpret_cast<const char*>(&(retval.at(0))), retval.size()-1);
+        }
+        else
+        {
+            // dump a human-readable indented rendering of the single-line JSON retrieved from packets
+            json_dump_stream << jsonDocument.toJson(QJsonDocument::Indented).data() << std::endl;
+        }
         json_dump_stream.flush();
         json_dump_stream.close();
 #endif

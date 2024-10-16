@@ -1,3 +1,6 @@
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 
 add_library(plug-mustang Mustang.cpp PacketSerializer.cpp Packet.cpp)
 add_library(plug-communication
@@ -10,10 +13,17 @@ add_library(plug-communication-usb
     UsbException.cpp
     UsbDevice.cpp
     )
-target_link_libraries(plug-communication-usb PRIVATE libusb-1.0::libusb-1.0)
+target_link_libraries(plug-mustang
+                        PUBLIC Qt6::Core
+                        )
+
+target_link_libraries(plug-communication-usb
+                        PRIVATE libusb-1.0::libusb-1.0
+                        )
 
 add_library(plug-libusb LibUsbCompat.cpp)
 target_link_libraries(plug-libusb PUBLIC libusb-1.0::libusb-1.0)
 
 add_library(plug-updater MustangUpdater.cpp)
 target_link_libraries(plug-updater PRIVATE libusb-1.0::libusb-1.0)
+
