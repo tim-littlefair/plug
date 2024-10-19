@@ -2,3 +2,8 @@ build/*
 CMakeUserPresets.json
 cppcheck-*
 *.cppcheck
+
+# Files created by KDevelop
+*.kdev4
+.kdev4
+
