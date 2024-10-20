@@ -41,6 +41,11 @@ namespace plug::com
             inline constexpr std::uint16_t mustangFloor{0x0012};
             inline constexpr std::uint16_t mustangI_II_v2{0x0014};
             inline constexpr std::uint16_t mustangIII_IV_V_v2{0x0016};
+
+            inline constexpr std::uint16_t mustangLT25{0x0037};
+            inline constexpr std::uint16_t rumbleLT25{0x0038};
+            inline constexpr std::uint16_t mustangLT40S{0x0046};
+            inline constexpr std::uint16_t mustangMicro{0x0043};
         }
 
         inline constexpr std::initializer_list<std::uint16_t> pids{
@@ -50,7 +55,13 @@ namespace plug::com
             usbPID::mustangMini,
             usbPID::mustangFloor,
             usbPID::mustangI_II_v2,
-            usbPID::mustangIII_IV_V_v2};
+            usbPID::mustangIII_IV_V_v2,
+
+            usbPID::mustangMicro,
+            usbPID::mustangLT25,
+            usbPID::rumbleLT25,
+            usbPID::mustangLT40S,
+        };
 
         DeviceModel getModel(std::uint16_t pid)
         {
@@ -70,6 +81,16 @@ namespace plug::com
                     return DeviceModel{"Mustang I/II", DeviceModel::Category::MustangV2, 24};
                 case usbPID::mustangIII_IV_V_v2:
                     return DeviceModel{"Mustang III/IV/V", DeviceModel::Category::MustangV2, 100};
+
+                // LT series
+                case usbPID::rumbleLT25:
+                    return DeviceModel{"Rumble LT 25", DeviceModel::Category::MustangV3_USB, 60};
+                case usbPID::mustangLT25:
+                    return DeviceModel{"Mustang LT 25", DeviceModel::Category::MustangV3_USB, 60};
+                case usbPID::mustangLT40S:
+                    return DeviceModel{"Mustang LT 40S", DeviceModel::Category::MustangV3_USB, 60};
+                // TODO: add mustangLT50 support when PID is known
+
                 default:
                     throw CommunicationException{"Unknown device pid: " + std::to_string(pid)};
             }
