@@ -28,6 +28,12 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iostream>
+
+#include <qt6/QtCore/QJsonParseError>
+#include <qt6/QtCore/QByteArray>
+#include <qt6/QtCore/QJsonParseError>
+#include <qt6/QtCore/QString>
 
 namespace plug::com
 {
@@ -49,9 +55,13 @@ namespace plug::com
 
         static MustangProtocolBase* factory(DeviceModel model);
 
-        virtual std::vector<Packet<EmptyPayload>> serializeInitCommand() = 0;
-
+        virtual std::array<Packet<EmptyPayload>,2> serializeInitCommand() = 0;
+        virtual Packet<EmptyPayload> serializeLoadCommand() = 0;
+        virtual InitialData decodePresetNamesAndSettings(std::vector<std::array<std::uint8_t, 64>> recieved_data) = 0;
     };
+
+    // Declarations of helper functions used by the V1V2 protocol - these are implemented in Mustang.cpp
+    SignalChain decode_data(const std::array<PacketRawType, 7>& data);
 
     class MustangProtocolV1V2: public MustangProtocolBase
     {
@@ -64,25 +74,37 @@ namespace plug::com
 
         };
 
-        std::vector<Packet<EmptyPayload>> serializeInitCommand()
+        std::array<Packet<EmptyPayload>,2> serializeInitCommand()
         {
-            std::vector<Packet<EmptyPayload>> retval;
+            return plug::com::serializeInitCommand();
+        }
 
-            Header header0{};
-            header0.setStage(Stage::init0);
-            header0.setType(Type::init0);
-            header0.setDSP(DSP::none);
-            retval.push_back(Packet<EmptyPayload>{header0, EmptyPayload{}});
+        Packet<EmptyPayload> serializeLoadCommand()
+        {
+            return plug::com::serializeLoadCommand();
+        }
 
-            Header header1{};
-            header1.setStage(Stage::init1);
-            header1.setType(Type::init1);
-            header1.setDSP(DSP::none);
-            retval.push_back(Packet<EmptyPayload>{header1, EmptyPayload{}});
+        InitialData decodePresetNamesAndSettings(std::vector<std::array<std::uint8_t, 64>> recieved_data)
+        {
+            const std::size_t numPresetPackets = m_model.numberOfPresets() > 0 ? (m_model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
+            std::vector<Packet<NamePayload>> presetListData;
+            presetListData.reserve(numPresetPackets);
+            std::transform(recieved_data.cbegin(), std::next(recieved_data.cbegin(), numPresetPackets), std::back_inserter(presetListData), [](const auto& p)
+                        {
+                Packet<NamePayload> packet{};
+                packet.fromBytes(p);
+                return packet; });
+            auto presetNames = decodePresetListFromData(presetListData);
 
-            return retval;
+            std::array<PacketRawType, 7> presetData{{}};
+            std::copy(std::next(recieved_data.cbegin(), numPresetPackets), std::next(recieved_data.cbegin(), numPresetPackets + 7), presetData.begin());
+
+            return {decode_data(presetData), presetNames};
         }
     };
+
+    // Forward declaration of helper function which is used to unpack V3 JSON payloads
+    std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label);
 
     class MustangProtocolV3: public MustangProtocolBase {
 
@@ -94,9 +116,9 @@ namespace plug::com
 
         };
 
-        std::vector<Packet<EmptyPayload>> serializeInitCommand()
+        std::array<Packet<EmptyPayload>,2> serializeInitCommand()
         {
-            std::vector<Packet<EmptyPayload>> retval;
+            std::array<Packet<EmptyPayload>,2> retval;
 
             Header header0{};
             std::array<uint8_t, 16> header0Bytes = {
@@ -112,7 +134,7 @@ namespace plug::com
                 0x10,
             };
             header0.fromBytes(header0Bytes);
-            retval.push_back(Packet<EmptyPayload>{header0, EmptyPayload{}});
+            retval[0] = Packet<EmptyPayload>{header0, EmptyPayload{}};
 
             Header header1{};
             std::array<uint8_t, 16> header1Bytes = {
@@ -129,8 +151,16 @@ namespace plug::com
                 0x10,
             };
             header1.fromBytes(header1Bytes);
-            retval.push_back(Packet<EmptyPayload>{header1, EmptyPayload{}});
+            retval[1] = Packet<EmptyPayload>{header1, EmptyPayload{}};
 
+#if 0
+#endif
+            return retval;
+        }
+
+        Packet<EmptyPayload> serializeLoadCommand()
+        {
+            Packet<EmptyPayload> retval;
             Header header2{};
             std::array<uint8_t, 16> header2Bytes = {
                 0x35,
@@ -147,11 +177,91 @@ namespace plug::com
                 0x10,
             };
             header2.fromBytes(header2Bytes);
-            retval.push_back(Packet<EmptyPayload>{header2, EmptyPayload{}});
+            return Packet<EmptyPayload>{header2, EmptyPayload{}};
+        }
 
-            return retval;
+        InitialData decodePresetNamesAndSettings(std::vector<std::array<std::uint8_t, 64>> /* recieved_data */)
+        {
+            std::array<PacketRawType, 7> presetData{{}};
+            std::vector<std::string>presetNames;
+            return {decode_data(presetData),presetNames};
+
         }
     };
+
+std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label) {
+        std::vector<uint8_t> retval = std::vector<uint8_t>();
+        for (size_t i=2; i<packets.size(); ++i)
+        {
+            PacketRawType p = packets.at(i);
+            int json_start_offset =3;
+            int json_length = p[2];
+
+            // p[0] is always 0
+            // p[1] is frame type
+            // p[2] is signficant data in frame (after p[2])
+
+            switch (p[1])
+            {
+                case 0x33:  // first frame of response
+                    // p[3] appears to hold number of bytes to be consumed
+                    // before JSON starts
+                    json_start_offset+= p[3] + 1;
+                    json_length -= ( p[3] + 1 ) ;
+                    break;
+
+                case 0x34: // any frame other than first and last
+                    json_start_offset = 3;
+                    break;
+
+
+                case 0x35: // last frame of response
+                    json_start_offset = 3;
+                    json_length -= 1;
+                    break;
+
+                default:
+                    json_start_offset = 3;
+                    json_length=0;
+                    continue;
+            }
+
+            std::cout << "i=" << i << " p1[1:2]=" << static_cast<unsigned int>(p[1]) << " " << static_cast<unsigned int>(p[2]) << " " << json_start_offset << " " << json_length << std::endl;
+
+            std::copy(
+                p.cbegin() + json_start_offset,
+                p.cbegin() + json_start_offset + json_length,
+                std::back_inserter(retval)
+            );
+        }
+#ifndef NDEBUG
+        std::string json_dump_fname = label;
+        json_dump_fname.append(".json");
+        std::ofstream json_dump_stream(json_dump_fname);
+
+        const char* jsonNullTerminatedCharString = reinterpret_cast<const char*>(&(retval.at(0)));
+
+
+        QByteArray jsonQByteArray(jsonNullTerminatedCharString,retval.size()-1);
+        QJsonParseError parseError;
+        QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonQByteArray, &parseError);
+        if(jsonDocument.isNull())
+        {
+            json_dump_stream << "JSON parse error of type " << parseError.error
+                             << " at offset " << parseError.offset  << std::endl << std::endl;
+            json_dump_stream.write(jsonNullTerminatedCharString, retval.size()-1);
+        }
+        else
+        {
+            // dump a human-readable indented rendering of the single-line JSON retrieved from packets
+            json_dump_stream << jsonDocument.toJson(QJsonDocument::Indented).data() << std::endl;
+        }
+        json_dump_stream.flush();
+        json_dump_stream.close();
+#endif
+
+        return retval;
+    }
 
 #ifdef INSTANTIATE_PROTOCOL_FACTORY_HERE
     MustangProtocolBase* MustangProtocolBase::factory(DeviceModel model)
@@ -171,4 +281,6 @@ namespace plug::com
     }
 #endif
 
+
 }
+

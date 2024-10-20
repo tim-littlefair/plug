@@ -37,6 +37,8 @@ namespace plug::com
         std::vector<std::string> presetNames;
     };
 
+    class MustangProtocolBase;
+
     class Mustang
     {
     public:
@@ -63,5 +65,6 @@ namespace plug::com
 
         const DeviceModel model;
         const std::shared_ptr<Connection> conn;
+        MustangProtocolBase *pProtocol;
     };
 }

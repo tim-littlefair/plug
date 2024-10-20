@@ -23,6 +23,17 @@
 #include "com/PacketSerializer.h"
 #include "com/CommunicationException.h"
 #include "com/Packet.h"
+
+// TODO: com/MustangProtocols.h currently contains
+// a common base class, separate classes extending
+// the base with V1/V2 and V3 protocols, and a factory
+// method which determines which base to instantiate.
+// Before doing a PR for this branch, these classes
+// will need to be separated out.
+#define INSTANTIATE_PROTOCOL_FACTORY_HERE
+#include "com/MustangProtocols.h"
+#undef INSTANTIATE_PROTOCOL_FACTORY_HERE
+
 #include <algorithm>
 
 namespace plug::com
@@ -76,8 +87,9 @@ namespace plug::com
 
 
     Mustang::Mustang(DeviceModel deviceModel, std::shared_ptr<Connection> connection)
-        : model(deviceModel), conn(connection)
+        : model(deviceModel), conn(connection), pProtocol(NULL)
     {
+        pProtocol = MustangProtocolBase::factory(deviceModel);
     }
 
     InitialData Mustang::start_amp()
@@ -156,7 +168,7 @@ namespace plug::com
     {
         std::vector<std::array<std::uint8_t, 64>> recieved_data;
 
-        const auto loadCommand = serializeLoadCommand();
+        const auto loadCommand = pProtocol->serializeLoadCommand();
         auto recieved = conn->send(loadCommand.getBytes());
 
         while (recieved != 0)
@@ -167,7 +179,8 @@ namespace plug::com
             std::copy(recvData.cbegin(), recvData.cend(), p.begin());
             recieved_data.push_back(p);
         }
-
+#if 0
+        // This block moved to MustangProtocolV1V2::decodePresetNamesAndSettings(...)
         const std::size_t numPresetPackets = model.numberOfPresets() > 0 ? (model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
         std::vector<Packet<NamePayload>> presetListData;
         presetListData.reserve(numPresetPackets);
@@ -182,11 +195,18 @@ namespace plug::com
         std::copy(std::next(recieved_data.cbegin(), numPresetPackets), std::next(recieved_data.cbegin(), numPresetPackets + 7), presetData.begin());
 
         return {decode_data(presetData), presetNames};
+#else
+        return pProtocol->decodePresetNamesAndSettings(recieved_data);
+#endif
     }
 
     void Mustang::initializeAmp()
     {
-        const auto packets = serializeInitCommand();
+        if (pProtocol==NULL)
+        {
+            throw CommunicationException{"No protocol has been selected"};
+        }
+        const auto packets = pProtocol ->serializeInitCommand();
         std::for_each(packets.cbegin(), packets.cend(), [this](const auto& p)
                       { sendCommand(*conn, p.getBytes()); });
     }
