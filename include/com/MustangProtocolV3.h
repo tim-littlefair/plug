@@ -114,7 +114,7 @@ namespace plug::com
             return Packet<EmptyPayload>{header2, EmptyPayload{}};
         }
 
-        InitialData decodePresetNamesAndSettings(std::vector<std::array<std::uint8_t, 64>> recieved_data)
+        InitialData decodeLoadResponsePackets(std::vector<std::array<std::uint8_t, 64>> recieved_data)
         {
             std::array<PacketRawType, 7> presetData{{}};
             std::vector<std::string>presetNames;

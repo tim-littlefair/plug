@@ -57,7 +57,7 @@ namespace plug::com
             return plug::com::serializeLoadCommand();
         }
 
-        InitialData decodePresetNamesAndSettings(std::vector<std::array<std::uint8_t, 64>> recieved_data)
+        InitialData decodeLoadResponsePackets(std::vector<std::array<std::uint8_t, 64>> recieved_data)
         {
             const std::size_t numPresetPackets = m_model.numberOfPresets() > 0 ? (m_model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
             std::vector<Packet<NamePayload>> presetListData;

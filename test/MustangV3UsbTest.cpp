@@ -139,8 +139,12 @@ namespace plug::test
         // Load cmd
         EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
 
-        // Preset names data
-        EXPECT_CALL(*conn, receive(packetRawTypeSize)).Times(numPresetPackets).WillRepeatedly(Return(ignoreData));
+        // V3 does not return preset names in the load response
+        // EXPECT_CALL(*conn, receive(packetRawTypeSize)).Times(numPresetPackets).WillRepeatedly(Return(ignoreData));
+
+        // TODO: Infrastructure required for preparing a sequence of packets wrapping JSON data conforming to V3 behaviour
+
+
 
         const std::string actualName{"abc"};
         const auto nameData = asBuffer(serializeName(0, actualName).getBytes());

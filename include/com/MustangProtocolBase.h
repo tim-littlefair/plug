@@ -52,7 +52,7 @@ namespace plug::com
 
         virtual std::array<Packet<EmptyPayload>,2> serializeInitCommand() = 0;
         virtual Packet<EmptyPayload> serializeLoadCommand() = 0;
-        virtual InitialData decodePresetNamesAndSettings(std::vector<std::array<std::uint8_t, 64>> recieved_data) = 0;
+        virtual InitialData decodeLoadResponsePackets(std::vector<std::array<std::uint8_t, 64>> recieved_data) = 0;
     };
 }
 

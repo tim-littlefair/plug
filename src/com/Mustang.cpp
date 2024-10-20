@@ -192,7 +192,7 @@ namespace plug::com
 
         return {decode_data(presetData), presetNames};
 #else
-        return pProtocol->decodePresetNamesAndSettings(recieved_data);
+        return pProtocol->decodeLoadResponsePackets(recieved_data);
 #endif
     }
 
