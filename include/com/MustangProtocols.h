@@ -180,18 +180,19 @@ namespace plug::com
             return Packet<EmptyPayload>{header2, EmptyPayload{}};
         }
 
-        InitialData decodePresetNamesAndSettings(std::vector<std::array<std::uint8_t, 64>> /* recieved_data */)
+        InitialData decodePresetNamesAndSettings(std::vector<std::array<std::uint8_t, 64>> recieved_data)
         {
             std::array<PacketRawType, 7> presetData{{}};
             std::vector<std::string>presetNames;
+            extractResponsePayload_V3_USB(recieved_data, "initial_data");
+            // decodePresetNamesAndSettings
             return {decode_data(presetData),presetNames};
-
         }
     };
 
-std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label) {
+    std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label) {
         std::vector<uint8_t> retval = std::vector<uint8_t>();
-        for (size_t i=2; i<packets.size(); ++i)
+        for (size_t i=0; i<packets.size(); ++i)
         {
             PacketRawType p = packets.at(i);
             int json_start_offset =3;
@@ -234,6 +235,7 @@ std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> pa
                 std::back_inserter(retval)
             );
         }
+
 #ifndef NDEBUG
         std::string json_dump_fname = label;
         json_dump_fname.append(".json");
