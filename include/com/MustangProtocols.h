@@ -104,7 +104,7 @@ namespace plug::com
     };
 
     // Forward declaration of helper function which is used to unpack V3 JSON payloads
-    std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label);
+    static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label);
 
     class MustangProtocolV3: public MustangProtocolBase {
 
@@ -190,7 +190,7 @@ namespace plug::com
         }
     };
 
-    std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label) {
+    static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label) {
         std::vector<uint8_t> retval = std::vector<uint8_t>();
         for (size_t i=0; i<packets.size(); ++i)
         {
