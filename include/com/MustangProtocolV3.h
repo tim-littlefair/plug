@@ -22,6 +22,7 @@
 #pragma once
 
 #include "com/Mustang.h"
+#include "com/MustangProtocolBase.h"
 #include "com/PacketSerializer.h"
 #include "com/CommunicationException.h"
 #include "com/Packet.h"
@@ -37,71 +38,6 @@
 
 namespace plug::com
 {
-
-    class MustangProtocolBase {
-    protected:
-        MustangProtocolBase(DeviceModel model) :
-            m_model(model)
-        {
-        }
-
-        virtual ~MustangProtocolBase()
-        {
-        }
-
-        DeviceModel m_model;
-
-    public:
-
-        static MustangProtocolBase* factory(DeviceModel model);
-
-        virtual std::array<Packet<EmptyPayload>,2> serializeInitCommand() = 0;
-        virtual Packet<EmptyPayload> serializeLoadCommand() = 0;
-        virtual InitialData decodePresetNamesAndSettings(std::vector<std::array<std::uint8_t, 64>> recieved_data) = 0;
-    };
-
-    // Declarations of helper functions used by the V1V2 protocol - these are implemented in Mustang.cpp
-    SignalChain decode_data(const std::array<PacketRawType, 7>& data);
-
-    class MustangProtocolV1V2: public MustangProtocolBase
-    {
-
-        public:
-
-        MustangProtocolV1V2(DeviceModel model):
-        MustangProtocolBase(model)
-        {
-
-        };
-
-        std::array<Packet<EmptyPayload>,2> serializeInitCommand()
-        {
-            return plug::com::serializeInitCommand();
-        }
-
-        Packet<EmptyPayload> serializeLoadCommand()
-        {
-            return plug::com::serializeLoadCommand();
-        }
-
-        InitialData decodePresetNamesAndSettings(std::vector<std::array<std::uint8_t, 64>> recieved_data)
-        {
-            const std::size_t numPresetPackets = m_model.numberOfPresets() > 0 ? (m_model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
-            std::vector<Packet<NamePayload>> presetListData;
-            presetListData.reserve(numPresetPackets);
-            std::transform(recieved_data.cbegin(), std::next(recieved_data.cbegin(), numPresetPackets), std::back_inserter(presetListData), [](const auto& p)
-                        {
-                Packet<NamePayload> packet{};
-                packet.fromBytes(p);
-                return packet; });
-            auto presetNames = decodePresetListFromData(presetListData);
-
-            std::array<PacketRawType, 7> presetData{{}};
-            std::copy(std::next(recieved_data.cbegin(), numPresetPackets), std::next(recieved_data.cbegin(), numPresetPackets + 7), presetData.begin());
-
-            return {decode_data(presetData), presetNames};
-        }
-    };
 
     // Forward declaration of helper function which is used to unpack V3 JSON payloads
     static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<PacketRawType> packets, const std::string label);
@@ -153,8 +89,6 @@ namespace plug::com
             header1.fromBytes(header1Bytes);
             retval[1] = Packet<EmptyPayload>{header1, EmptyPayload{}};
 
-#if 0
-#endif
             return retval;
         }
 
@@ -185,7 +119,6 @@ namespace plug::com
             std::array<PacketRawType, 7> presetData{{}};
             std::vector<std::string>presetNames;
             extractResponsePayload_V3_USB(recieved_data, "initial_data");
-            // decodePresetNamesAndSettings
             return {decode_data(presetData),presetNames};
         }
     };
@@ -264,25 +197,5 @@ namespace plug::com
 
         return retval;
     }
-
-#ifdef INSTANTIATE_PROTOCOL_FACTORY_HERE
-    MustangProtocolBase* MustangProtocolBase::factory(DeviceModel model)
-    {
-        switch ( model.category() )
-        {
-            case DeviceModel::Category::MustangV1:
-            case DeviceModel::Category::MustangV2:
-                return new MustangProtocolV1V2(model);
-
-            case DeviceModel::Category::MustangV3_USB:
-                return new MustangProtocolV3(model);
-
-            default:
-                return NULL;
-        }
-    }
-#endif
-
-
 }
 

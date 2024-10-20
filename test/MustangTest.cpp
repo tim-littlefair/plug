@@ -22,7 +22,7 @@
 #include "com/Packet.h"
 #include "com/PacketSerializer.h"
 #include "com/CommunicationException.h"
-#include "com/MustangProtocols.h"
+#include "com/MustangProtocolBase.h"
 #include "mocks/MockConnection.h"
 #include "matcher/Matcher.h"
 #include "matcher/TypeMatcher.h"

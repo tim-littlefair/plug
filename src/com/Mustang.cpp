@@ -24,14 +24,10 @@
 #include "com/CommunicationException.h"
 #include "com/Packet.h"
 
-// TODO: com/MustangProtocols.h currently contains
-// a common base class, separate classes extending
-// the base with V1/V2 and V3 protocols, and a factory
-// method which determines which base to instantiate.
-// Before doing a PR for this branch, these classes
-// will need to be separated out.
+
+// TODO: Tidy up the protocol classes
 #define INSTANTIATE_PROTOCOL_FACTORY_HERE
-#include "com/MustangProtocols.h"
+#include "com/MustangProtocolBase.h"
 #undef INSTANTIATE_PROTOCOL_FACTORY_HERE
 
 #include <algorithm>
