@@ -59,29 +59,14 @@ namespace plug::com
             std::array<Packet<EmptyPayload>,2> retval;
 
             Header header0{};
-#if 0
-            std::array<uint8_t, 16> header0Bytes = {
-                0x35,
-                0x09,
-                0x08,
-                0x00,
-                0x8a,
-                0x07,
-                0x04,
-                0x08,
-                0x00,
-                0x10,
-            };
-            header0.fromBytes(header0Bytes);
-#else
-            std::string hexBytes("350908008a0704080010");
+            std::string hexBytes0("350908008a0704080010");
             std::array<uint8_t, 16> header0Bytes;
-            hexStringToArrayOf16Bytes(hexBytes, header0Bytes);
+            hexStringToArrayOf16Bytes(hexBytes0, header0Bytes);
             header0.fromBytes(header0Bytes);
-#endif
             retval[0] = Packet<EmptyPayload>{header0, EmptyPayload{}};
 
             Header header1{};
+#if 0
             std::array<uint8_t, 16> header1Bytes = {
                 0x35,
                 0x07,
@@ -95,6 +80,12 @@ namespace plug::com
                 0x00,
                 0x10,
             };
+            header1.fromBytes(header1Bytes);
+#else
+            std::string hexBytes1("35070800b2060208010010");
+            std::array<uint8_t, 16> header1Bytes;
+            hexStringToArrayOf16Bytes(hexBytes1, header1Bytes);
+#endif
             header1.fromBytes(header1Bytes);
             retval[1] = Packet<EmptyPayload>{header1, EmptyPayload{}};
 
@@ -136,6 +127,35 @@ namespace plug::com
                 snprintf(presetFilename,sizeof(presetFilename),"preset%02lu",i);
                 extractResponsePayload_V3_USB(receivedData, presetFilename);
             }
+
+            for(size_t i=1; i<5; ++i)
+            {
+                const auto loadCommand = this->serializeNextRequestCommand(i);
+                auto recieved = conn->send(loadCommand.getBytes());
+
+                if(recieved==0)
+                {
+                    char exception_message[100];
+                    snprintf(
+                        exception_message,sizeof(exception_message),
+                        "Empty response to request for next %lu", i
+                    );
+                    throw CommunicationException(exception_message);
+                }
+
+                const auto receivedData = receiveResponse(conn, true);
+                char dumpFilename[20];
+                snprintf(dumpFilename,sizeof(dumpFilename),"next%02lu.dat",i);
+#if 0
+                std::ofstream dump_stream(dumpFilename);
+                for(int i=0; i< receivedData.length())
+                {
+                    dump_stream.write(static_cast<uint8_t>(receivedData[i]),64);
+                }
+#endif
+                std::cout << dumpFilename << std::endl;
+            }
+
             return {decode_data(presetData),presetNames};
         }
 
@@ -145,6 +165,7 @@ namespace plug::com
         {
             Packet<EmptyPayload> retval;
             Header header2{};
+#if 0
             std::array<uint8_t, 16> header2Bytes = {
                 0x35,
                 0x07,
@@ -159,6 +180,11 @@ namespace plug::com
                 0x00,
                 0x10,
             };
+#else
+            std::string hexBytes2("35070800ca060208010110");
+            std::array<uint8_t, 16> header2Bytes;
+            hexStringToArrayOf16Bytes(hexBytes2, header2Bytes);
+#endif
             header2Bytes[8] = presetIndex;
             header2.fromBytes(header2Bytes);
             return Packet<EmptyPayload>{header2, EmptyPayload{}};
@@ -194,7 +220,6 @@ namespace plug::com
             header.fromBytes(headerBytes);
             return Packet<EmptyPayload>{header, EmptyPayload{}};
         }
-
     };
 } // end of namespace
 
