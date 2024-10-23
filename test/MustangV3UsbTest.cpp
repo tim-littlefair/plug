@@ -45,7 +45,7 @@ namespace plug::test
             conn = std::make_shared<mock::MockConnection>();
             m = std::make_unique<com::Mustang>(DeviceModel{"V3 Test Device", DeviceModel::Category::MustangV3_USB, 100}, conn);
             p = MustangProtocolBase::factory(m->getDeviceModel());
-            loadCmd = p->serializeLoadCommand().getBytes();
+            //loadCmd = p->serializeLoadCommand().getBytes();
         }
 
         void TearDown() override

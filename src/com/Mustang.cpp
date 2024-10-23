@@ -162,9 +162,12 @@ namespace plug::com
 
     InitialData Mustang::loadData()
     {
+#if 0
+        // This block moved to MustangProtocolV1V2::loadPresetData(...)
+
         std::vector<std::array<std::uint8_t, 64>> recieved_data;
 
-        const auto loadCommand = pProtocol->serializeLoadCommand();
+        const auto loadCommand = serializeLoadCommand();
         auto recieved = conn->send(loadCommand.getBytes());
 
         while (recieved != 0)
@@ -175,8 +178,6 @@ namespace plug::com
             std::copy(recvData.cbegin(), recvData.cend(), p.begin());
             recieved_data.push_back(p);
         }
-#if 0
-        // This block moved to MustangProtocolV1V2::decodePresetNamesAndSettings(...)
         const std::size_t numPresetPackets = model.numberOfPresets() > 0 ? (model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
         std::vector<Packet<NamePayload>> presetListData;
         presetListData.reserve(numPresetPackets);
@@ -192,7 +193,7 @@ namespace plug::com
 
         return {decode_data(presetData), presetNames};
 #else
-        return pProtocol->decodeLoadResponsePackets(recieved_data);
+        return pProtocol->loadPresetData(conn);
 #endif
     }
 

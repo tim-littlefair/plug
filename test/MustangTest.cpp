@@ -22,7 +22,7 @@
 #include "com/Packet.h"
 #include "com/PacketSerializer.h"
 #include "com/CommunicationException.h"
-#include "com/MustangProtocolBase.h"
+#include "com/MustangProtocolV1V2.h"
 #include "mocks/MockConnection.h"
 #include "matcher/Matcher.h"
 #include "matcher/TypeMatcher.h"
@@ -44,8 +44,8 @@ namespace plug::test
         {
             conn = std::make_shared<mock::MockConnection>();
             m = std::make_unique<com::Mustang>(DeviceModel{"Test Device", DeviceModel::Category::MustangV1, 100}, conn);
-            p = MustangProtocolBase::factory(m->getDeviceModel());
-            loadCmd = p->serializeLoadCommand().getBytes();
+            p = dynamic_cast<MustangProtocolV1V2*>(MustangProtocolBase::factory(m->getDeviceModel()));
+            loadCmd = p->serializeV1V2LoadCommand().getBytes();
         }
 
         void TearDown() override
@@ -66,7 +66,7 @@ namespace plug::test
 
         std::shared_ptr<mock::MockConnection> conn;
         std::unique_ptr<com::Mustang> m;
-        MustangProtocolBase *p;
+        MustangProtocolV1V2 *p;
         const std::vector<std::uint8_t> noData{};
         const std::vector<std::uint8_t> ignoreData = std::vector<std::uint8_t>(packetRawTypeSize);
         const std::vector<std::uint8_t> ignoreAmpData = []

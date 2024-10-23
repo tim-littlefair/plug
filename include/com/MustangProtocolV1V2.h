@@ -52,13 +52,26 @@ namespace plug::com
             return plug::com::serializeInitCommand();
         }
 
-        Packet<EmptyPayload> serializeLoadCommand()
+        Packet<EmptyPayload> serializeV1V2LoadCommand()
         {
             return plug::com::serializeLoadCommand();
         }
 
-        InitialData decodeLoadResponsePackets(std::vector<std::array<std::uint8_t, 64>> recieved_data)
+        InitialData loadPresetData(const std::shared_ptr<Connection> conn)
         {
+            std::vector<std::array<std::uint8_t, 64>> recieved_data;
+
+            const auto loadCommand = this->serializeV1V2LoadCommand();
+            auto recieved = conn->send(loadCommand.getBytes());
+
+            while (recieved != 0)
+            {
+                const auto recvData = receivePacket(*conn);
+                recieved = recvData.size();
+                PacketRawType p{};
+                std::copy(recvData.cbegin(), recvData.cend(), p.begin());
+                recieved_data.push_back(p);
+            }
             const std::size_t numPresetPackets = m_model.numberOfPresets() > 0 ? (m_model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
             std::vector<Packet<NamePayload>> presetListData;
             presetListData.reserve(numPresetPackets);

@@ -25,6 +25,9 @@
 #include "com/PacketSerializer.h"
 #include "com/CommunicationException.h"
 #include "com/Packet.h"
+#include "com/Connection.h"
+#include "com/Packet.h"
+
 
 #include <algorithm>
 #include <fstream>
@@ -50,9 +53,13 @@ namespace plug::com
 
         static MustangProtocolBase* factory(DeviceModel model);
 
+        std::vector<std::uint8_t> receivePacket(Connection& conn)
+        {
+            return conn.receive(packetRawTypeSize);
+        }
+
         virtual std::array<Packet<EmptyPayload>,2> serializeInitCommand() = 0;
-        virtual Packet<EmptyPayload> serializeLoadCommand() = 0;
-        virtual InitialData decodeLoadResponsePackets(std::vector<std::array<std::uint8_t, 64>> recieved_data) = 0;
+        virtual InitialData loadPresetData(const std::shared_ptr<Connection> conn) = 0;
     };
 }
 
