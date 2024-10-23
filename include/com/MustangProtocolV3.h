@@ -39,7 +39,7 @@
 
 // Forward declarations of helper functions
 // definitions of these are at the end of the file, after the namespace closes
-//static std::vector<uint8_t> hexStringVectorOfBytes(const std::string& hexString);
+static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outHeaderBytes);
 static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets, const std::string label);
 
 namespace plug::com
@@ -59,6 +59,7 @@ namespace plug::com
             std::array<Packet<EmptyPayload>,2> retval;
 
             Header header0{};
+#if 0
             std::array<uint8_t, 16> header0Bytes = {
                 0x35,
                 0x09,
@@ -72,6 +73,12 @@ namespace plug::com
                 0x10,
             };
             header0.fromBytes(header0Bytes);
+#else
+            std::string hexBytes("350908008a0704080010");
+            std::array<uint8_t, 16> header0Bytes;
+            hexStringToArrayOf16Bytes(hexBytes, header0Bytes);
+            header0.fromBytes(header0Bytes);
+#endif
             retval[0] = Packet<EmptyPayload>{header0, EmptyPayload{}};
 
             Header header1{};
@@ -97,6 +104,15 @@ namespace plug::com
         InitialData loadPresetData(const std::shared_ptr<Connection> conn)
         {
             std::array<PacketRawType, 7> presetData{{}};
+#if 0
+        const auto name = decodeNameFromData(fromRawData<NamePayload>(data[0]));
+        const auto amp = decodeAmpFromData(fromRawData<AmpPayload>(data[1]), fromRawData<AmpPayload>(data[6]));
+        const auto effects = decodeEffectsFromData({{fromRawData<EffectPayload>(data[2]), fromRawData<EffectPayload>(data[3]),
+                                                     fromRawData<EffectPayload>(data[4]), fromRawData<EffectPayload>(data[5])}});
+
+        return SignalChain{name, amp, effects};
+#endif
+
             std::vector<std::string>presetNames;
 
             for(size_t i=1; i<=m_model.numberOfPresets(); ++i)
@@ -148,27 +164,61 @@ namespace plug::com
             return Packet<EmptyPayload>{header2, EmptyPayload{}};
         }
 
+        Packet<EmptyPayload> serializeNextRequestCommand(int index)
+        {
+            Packet<EmptyPayload> retval;
+            Header header{};
+#if 0
+            std::array<uint8_t, 16> headerBytes = {
+                0x35,
+                0x07,
+                0x08,
+                0x00,
+                0xca,
+                0x06,
+                0x02,
+                0x08,
+                0x01,
+                0x01,
+                0x00,
+                0x10,
+            };
+            header.fromBytes(hexStringToArrayOf16Bytes(hexBytes));
+#else
+            // "07:08:00:c2:06:02:08:01:
+            std::string hexBytes("070800c206020801");
+            std::array<uint8_t, 16> headerBytes;
+            hexStringToArrayOf16Bytes(hexBytes, headerBytes);
+#endif
+            headerBytes[8] = index;
+            header.fromBytes(headerBytes);
+            return Packet<EmptyPayload>{header, EmptyPayload{}};
+        }
+
     };
 } // end of namespace
 
-/*
 // definitions of static helper functions
-static std::vector<uint8_t> hexStringVectorOfBytes(const std::string& hexString)
+
+static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outByteArray)
 {
-    assert(hexString.length()%2==0);
+    assert(inHexString.length()%2==0);
 
-    std::vector<uint8_t> retval;
-
-    for (unsigned int i = 0; i < hexString.length(); i += 2)
+    for (size_t i = 0; i<sizeof(outByteArray); ++i)
     {
-        std::string byteString = hexString.substr(i, 2);
-        uint8_t nextByte = static_cast<uint8_t>(strtol(byteString.c_str(), NULL, 16));
-        retval.push_back(nextByte);
+        if(2*i<inHexString.length())
+        {
+            std::string byteString = inHexString.substr(2*i, 2);
+            uint8_t nextByte = static_cast<uint8_t>(strtol(byteString.c_str(), NULL, 16));
+            outByteArray[i] = nextByte;
+        }
+        else
+        {
+            outByteArray[i] = static_cast<uint8_t>(0);
+        }
     }
 
-    return retval;
 }
-*/
 
 static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets, const std::string label) {
     std::vector<uint8_t> retval = std::vector<uint8_t>();
