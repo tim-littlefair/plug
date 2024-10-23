@@ -99,8 +99,7 @@ namespace plug::com
             std::array<PacketRawType, 7> presetData{{}};
             std::vector<std::string>presetNames;
 
-            // TODO: number of presets to request should come from this->m_model
-            for(int i=1; i<=60; ++i)
+            for(size_t i=1; i<=m_model.numberOfPresets(); ++i)
             {
                 const auto loadCommand = this->serializePresetRequestCommand(i);
                 auto recieved = conn->send(loadCommand.getBytes());
@@ -110,7 +109,7 @@ namespace plug::com
                     char exception_message[100];
                     snprintf(
                         exception_message,sizeof(exception_message),
-                        "Empty response to request for preset %d", i
+                        "Empty response to request for preset %lu", i
                     );
                     throw CommunicationException(exception_message);
                 }
@@ -118,7 +117,7 @@ namespace plug::com
                 const auto receivedData = receiveResponse(conn, true);
                 char presetFilename[20];
 
-                snprintf(presetFilename,sizeof(presetFilename),"preset%02d",i);
+                snprintf(presetFilename,sizeof(presetFilename),"preset%02lu",i);
                 extractResponsePayload_V3_USB(receivedData, presetFilename);
             }
             return {decode_data(presetData),presetNames};
