@@ -63,7 +63,7 @@ namespace plug::com
 
             const auto loadCommand = this->serializeV1V2LoadCommand();
             auto recieved = conn->send(loadCommand.getBytes());
-
+#if 0
             while (recieved != 0)
             {
                 const auto recvData = receivePacket(*conn);
@@ -72,6 +72,16 @@ namespace plug::com
                 std::copy(recvData.cbegin(), recvData.cend(), p.begin());
                 recieved_data.push_back(p);
             }
+#else
+            // This call tries to be exactly equivalent to the old
+            // implementation.  Pass 'true' instead of 'false' if the end
+            // of the response can be detected by checking for value 0x35
+            // in the second byte of each packet.
+            if(recieved != 0)
+            {
+                recieved_data = receiveResponse(conn,false);
+            }
+#endif
             const std::size_t numPresetPackets = m_model.numberOfPresets() > 0 ? (m_model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
             std::vector<Packet<NamePayload>> presetListData;
             presetListData.reserve(numPresetPackets);

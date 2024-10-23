@@ -102,24 +102,24 @@ namespace plug::com
             // TODO: number of presets to request should come from this->m_model
             for(int i=1; i<=60; ++i)
             {
-                std::vector<std::array<std::uint8_t, 64>> recieved_data;
-
                 const auto loadCommand = this->serializePresetRequestCommand(i);
                 auto recieved = conn->send(loadCommand.getBytes());
 
-                while (recieved != 0)
+                if(recieved==0)
                 {
-                    const auto recvData = receivePacket(*conn);
-                    recieved = recvData.size();
-                    PacketRawType p{};
-                    std::copy(recvData.cbegin(), recvData.cend(), p.begin());
-                    recieved_data.push_back(p);
+                    char exception_message[100];
+                    snprintf(
+                        exception_message,sizeof(exception_message),
+                        "Empty response to request for preset %d", i
+                    );
+                    throw CommunicationException(exception_message);
                 }
 
+                const auto receivedData = receiveResponse(conn, true);
                 char presetFilename[20];
 
                 snprintf(presetFilename,sizeof(presetFilename),"preset%02d",i);
-                extractResponsePayload_V3_USB(recieved_data, presetFilename);
+                extractResponsePayload_V3_USB(receivedData, presetFilename);
             }
             return {decode_data(presetData),presetNames};
         }
