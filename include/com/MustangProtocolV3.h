@@ -40,11 +40,15 @@
 // Forward declarations of helper functions
 // definitions of these are at the end of the file, after the namespace closes
 static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outHeaderBytes);
-static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets, const std::string label);
+static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets);
+static void debug_dump_json(std::vector<uint8_t> retval, const std::string& label);
+static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label);
 
 namespace plug::com
 {
     class MustangProtocolV3: public MustangProtocolBase {
+        private:
+        const std::shared_ptr<Connection>* m_ppConn = NULL;
 
         public:
 
@@ -66,26 +70,9 @@ namespace plug::com
             retval[0] = Packet<EmptyPayload>{header0, EmptyPayload{}};
 
             Header header1{};
-#if 0
-            std::array<uint8_t, 16> header1Bytes = {
-                0x35,
-                0x07,
-                0x08,
-                0x00,
-                0xb2,
-                0x06,
-                0x02,
-                0x08,
-                0x01,
-                0x00,
-                0x10,
-            };
-            header1.fromBytes(header1Bytes);
-#else
             std::string hexBytes1("35070800b2060208010010");
             std::array<uint8_t, 16> header1Bytes;
             hexStringToArrayOf16Bytes(hexBytes1, header1Bytes);
-#endif
             header1.fromBytes(header1Bytes);
             retval[1] = Packet<EmptyPayload>{header1, EmptyPayload{}};
 
@@ -125,66 +112,73 @@ namespace plug::com
                 char presetFilename[20];
 
                 snprintf(presetFilename,sizeof(presetFilename),"preset%02lu",i);
-                extractResponsePayload_V3_USB(receivedData, presetFilename);
+                std::vector<uint8_t> response_bytes = extractResponsePayload_V3_USB(receivedData);
+                debug_dump_json(response_bytes, presetFilename);
             }
 
-            for(size_t i=1; i<5; ++i)
-            {
-                const auto loadCommand = this->serializeNextRequestCommand(i);
-                auto recieved = conn->send(loadCommand.getBytes());
+            m_ppConn = &conn;
+            std::vector<uint8_t> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801");
+            std::vector<uint8_t> response_bytes_1 = sendCommandAndReceiveResponse("unknown_1","35070800f203020801");
+            std::vector<uint8_t> response_bytes_2 = sendCommandAndReceiveResponse("unknown_2","35070800d206020801");
+            std::vector<uint8_t> response_bytes_3 = sendCommandAndReceiveResponse("unknown_3","35070800e206020801");
+            std::vector<uint8_t> response_bytes_4 = sendCommandAndReceiveResponse("unknown_4","35070800d20c020801");
+            std::vector<uint8_t> response_bytes_5 = sendCommandAndReceiveResponse("unknown_5","350908008a07040801");
+            std::vector<uint8_t> response_bytes_6 = sendCommandAndReceiveResponse("unknown_6","35070800ca0c020801");
+            m_ppConn = NULL;
 
-                if(recieved==0)
-                {
-                    char exception_message[100];
-                    snprintf(
-                        exception_message,sizeof(exception_message),
-                        "Empty response to request for next %lu", i
-                    );
-                    throw CommunicationException(exception_message);
-                }
-
-                const auto receivedData = receiveResponse(conn, true);
-                char dumpFilename[20];
-                snprintf(dumpFilename,sizeof(dumpFilename),"next%02lu.dat",i);
-#if 0
-                std::ofstream dump_stream(dumpFilename);
-                for(int i=0; i< receivedData.length())
-                {
-                    dump_stream.write(static_cast<uint8_t>(receivedData[i]),64);
-                }
-#endif
-                std::cout << dumpFilename << std::endl;
-            }
+            debug_dump_json(current_preset_response_bytes, "current_preset");
+            debug_dump_hex(response_bytes_1, "unknown_1");
+            debug_dump_hex(response_bytes_2, "unknown_2");
+            debug_dump_hex(response_bytes_3, "unknown_3");
+            debug_dump_hex(response_bytes_4, "unknown_4");
+            debug_dump_hex(response_bytes_5, "unknown_5");
+            debug_dump_hex(response_bytes_6, "unknown_6");
 
             return {decode_data(presetData),presetNames};
         }
 
         private:
 
+        std::vector<uint8_t> sendCommandAndReceiveResponse(
+            const char *command_description,
+            const char *command_hex_bytes
+        )
+        {
+            Header header;
+            std::array<uint8_t, 16> headerBytes;
+            hexStringToArrayOf16Bytes(command_hex_bytes, headerBytes);
+            header.fromBytes(headerBytes);
+            const auto command = Packet<EmptyPayload>{header, EmptyPayload{}};
+
+            auto recieved = (*m_ppConn)->send(command.getBytes());
+
+            if(recieved==0)
+            {
+                char exception_message[100];
+                snprintf(
+                    exception_message,sizeof(exception_message),
+                    "Empty response to %s request",
+                    command_description
+                );
+                throw CommunicationException(exception_message);
+            }
+
+            const auto receivedData = receiveResponse((*m_ppConn), true);
+
+            std::vector<uint8_t> response_bytes = extractResponsePayload_V3_USB(receivedData);
+
+            return response_bytes;
+        }
+
+
+
         Packet<EmptyPayload> serializePresetRequestCommand(int presetIndex)
         {
             Packet<EmptyPayload> retval;
             Header header2{};
-#if 0
-            std::array<uint8_t, 16> header2Bytes = {
-                0x35,
-                0x07,
-                0x08,
-                0x00,
-                0xca,
-                0x06,
-                0x02,
-                0x08,
-                0x01,
-                0x01,
-                0x00,
-                0x10,
-            };
-#else
             std::string hexBytes2("35070800ca060208010110");
             std::array<uint8_t, 16> header2Bytes;
             hexStringToArrayOf16Bytes(hexBytes2, header2Bytes);
-#endif
             header2Bytes[8] = presetIndex;
             header2.fromBytes(header2Bytes);
             return Packet<EmptyPayload>{header2, EmptyPayload{}};
@@ -194,34 +188,36 @@ namespace plug::com
         {
             Packet<EmptyPayload> retval;
             Header header{};
-#if 0
-            std::array<uint8_t, 16> headerBytes = {
-                0x35,
-                0x07,
-                0x08,
-                0x00,
-                0xca,
-                0x06,
-                0x02,
-                0x08,
-                0x01,
-                0x01,
-                0x00,
-                0x10,
-            };
-            header.fromBytes(hexStringToArrayOf16Bytes(hexBytes));
-#else
-            // "07:08:00:c2:06:02:08:01:
-            std::string hexBytes("070800c206020801");
+            // "35:07:08:00:c2:06:02:08:01:
+            std::string hexBytes("35070800c206020801");
             std::array<uint8_t, 16> headerBytes;
             hexStringToArrayOf16Bytes(hexBytes, headerBytes);
-#endif
             headerBytes[8] = index;
             header.fromBytes(headerBytes);
             return Packet<EmptyPayload>{header, EmptyPayload{}};
         }
     };
 } // end of namespace
+
+#if 0
+
+35:07:08:00:c2:06:02:08:01:3c:3b:3a
+35:07:08:00:f2:03:02:08:01:01:3c:3b:3a
+35:07:08:00:d2:06:02:08:01:01:01:3c:3b:3a
+35:07:08:00:e2:06:02:08:01:01:01:01:3c
+35:07:08:00:d2:0c:02:08:01:01:01
+35:09:08:00:8a:07:04:08:01:10:00
+35:07:08:00:ca:0c:02:08:01:
+35:07:08:00:ca:0c:02:08:01
+
+
+
+
+
+
+
+
+#endif
 
 // definitions of static helper functions
 
@@ -245,7 +241,7 @@ static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array
 
 }
 
-static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets, const std::string label) {
+static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets) {
     std::vector<uint8_t> retval = std::vector<uint8_t>();
     for (size_t i=0; i<packets.size(); ++i)
     {
@@ -290,7 +286,11 @@ static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com:
             std::back_inserter(retval)
         );
     }
+    return retval;
+}
 
+static void debug_dump_json(std::vector<uint8_t> retval, const std::string& label)
+{
 #ifndef NDEBUG
     std::string json_dump_fname = label;
     json_dump_fname.append(".json");
@@ -316,7 +316,47 @@ static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com:
     json_dump_stream.flush();
     json_dump_stream.close();
 #endif
-
-    return retval;
 }
 
+static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label)
+{
+#ifndef NDEBUG
+    std::string hex_dump_fname = label;
+    hex_dump_fname.append(".hex");
+    std::ofstream hex_dump_stream(hex_dump_fname);
+
+    size_t hex_line_offset = 0;
+    while(hex_line_offset<retval.size())
+    {
+        std::ostringstream line_hex_string;
+        line_hex_string.setf(std::ios::hex,std::ios::dec);
+        line_hex_string.width(2);
+        line_hex_string.fill('0');
+        std::ostringstream line_char_string;
+        for(size_t line_byte_index = 0; line_byte_index<16; ++line_byte_index)
+        {
+            size_t vector_byte_offset = hex_line_offset + line_byte_index;
+            if (vector_byte_offset>retval.size())
+            {
+                line_hex_string << "   ";
+                line_char_string << " ";
+                continue;
+            }
+            uint8_t byte_value = retval[vector_byte_offset];
+            line_hex_string << " " << static_cast<unsigned int>(byte_value);
+            if( (byte_value>=0x20) && (byte_value < 0x80) )
+            {
+                line_char_string << static_cast<char>(byte_value);
+            }
+            else
+            {
+                line_char_string << '.';
+            }
+        }
+        //line_hex_string << std::ends;
+        //line_char_string << std::ends;
+        hex_dump_stream << line_hex_string.str() << "   " << line_char_string.str() << std::endl;
+        hex_line_offset += 16;
+    }
+#endif
+}
