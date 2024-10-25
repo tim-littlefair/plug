@@ -19,13 +19,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include "com/MustangProtocolV3.h"
 
-#include "com/Mustang.h"
-#include "com/MustangProtocolBase.h"
-#include "com/PacketSerializer.h"
-#include "com/CommunicationException.h"
-#include "com/Packet.h"
+#include "com/MustangProtocolV1V2.h"
 
 #include <algorithm>
 
@@ -49,178 +45,150 @@ static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label
 
 namespace plug::com
 {
-    class MustangProtocolV3: public MustangProtocolBase {
-        private:
-        const std::shared_ptr<Connection>* m_ppConn = NULL;
 
-        public:
+    MustangProtocolV3::MustangProtocolV3(DeviceModel model):
+    MustangProtocolBase(model)
+    {
 
-        MustangProtocolV3(DeviceModel model):
-        MustangProtocolBase(model)
-        {
+    };
 
-        };
+    std::array<Packet<EmptyPayload>,2> MustangProtocolV3::serializeInitCommand()
+    {
+        std::array<Packet<EmptyPayload>,2> retval;
 
-        std::array<Packet<EmptyPayload>,2> serializeInitCommand()
-        {
-            std::array<Packet<EmptyPayload>,2> retval;
+        Header header0{};
+        std::string hexBytes0("350908008a0704080010");
+        std::array<uint8_t, 16> header0Bytes;
+        hexStringToArrayOf16Bytes(hexBytes0, header0Bytes);
+        header0.fromBytes(header0Bytes);
+        retval[0] = Packet<EmptyPayload>{header0, EmptyPayload{}};
 
-            Header header0{};
-            std::string hexBytes0("350908008a0704080010");
-            std::array<uint8_t, 16> header0Bytes;
-            hexStringToArrayOf16Bytes(hexBytes0, header0Bytes);
-            header0.fromBytes(header0Bytes);
-            retval[0] = Packet<EmptyPayload>{header0, EmptyPayload{}};
+        Header header1{};
+        std::string hexBytes1("35070800b2060208010010");
+        std::array<uint8_t, 16> header1Bytes;
+        hexStringToArrayOf16Bytes(hexBytes1, header1Bytes);
+        header1.fromBytes(header1Bytes);
+        retval[1] = Packet<EmptyPayload>{header1, EmptyPayload{}};
 
-            Header header1{};
-            std::string hexBytes1("35070800b2060208010010");
-            std::array<uint8_t, 16> header1Bytes;
-            hexStringToArrayOf16Bytes(hexBytes1, header1Bytes);
-            header1.fromBytes(header1Bytes);
-            retval[1] = Packet<EmptyPayload>{header1, EmptyPayload{}};
+        return retval;
+    }
 
-            return retval;
-        }
-
-        InitialData loadPresetData(const std::shared_ptr<Connection> conn)
-        {
-            std::array<PacketRawType, 7> presetData{{}};
+    InitialData MustangProtocolV3::loadPresetData(const std::shared_ptr<Connection> conn)
+    {
+        std::array<PacketRawType, 7> presetData{{}};
 #if 0
-        const auto name = decodeNameFromData(fromRawData<NamePayload>(data[0]));
-        const auto amp = decodeAmpFromData(fromRawData<AmpPayload>(data[1]), fromRawData<AmpPayload>(data[6]));
-        const auto effects = decodeEffectsFromData({{fromRawData<EffectPayload>(data[2]), fromRawData<EffectPayload>(data[3]),
-                                                     fromRawData<EffectPayload>(data[4]), fromRawData<EffectPayload>(data[5])}});
+    const auto name = decodeNameFromData(fromRawData<NamePayload>(data[0]));
+    const auto amp = decodeAmpFromData(fromRawData<AmpPayload>(data[1]), fromRawData<AmpPayload>(data[6]));
+    const auto effects = decodeEffectsFromData({{fromRawData<EffectPayload>(data[2]), fromRawData<EffectPayload>(data[3]),
+                                                    fromRawData<EffectPayload>(data[4]), fromRawData<EffectPayload>(data[5])}});
 
-        return SignalChain{name, amp, effects};
+    return SignalChain{name, amp, effects};
 #endif
 
-            std::vector<std::string>presetNames;
+        std::vector<std::string>presetNames;
 
-            for(size_t i=1; i<=m_model.numberOfPresets(); ++i)
-            {
-                const auto loadCommand = this->serializePresetRequestCommand(i);
-                auto recieved = conn->send(loadCommand.getBytes());
-
-                if(recieved==0)
-                {
-                    char exception_message[100];
-                    snprintf(
-                        exception_message,sizeof(exception_message),
-                        "Empty response to request for preset %lu", i
-                    );
-                    throw CommunicationException(exception_message);
-                }
-
-                const auto receivedData = receiveResponse(conn, true);
-                char presetFilename[20];
-
-                snprintf(presetFilename,sizeof(presetFilename),"preset%02lu",i);
-                std::vector<uint8_t> response_bytes = extractResponsePayload_V3_USB(receivedData);
-                debug_dump_json(response_bytes, presetFilename);
-            }
-
-            m_ppConn = &conn;
-            std::vector<uint8_t> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801");
-            std::vector<uint8_t> response_bytes_1 = sendCommandAndReceiveResponse("unknown_1","35070800f2030208010101");
-            std::vector<uint8_t> response_bytes_2 = sendCommandAndReceiveResponse("unknown_2","35070800d206020801010101");
-            std::vector<uint8_t> response_bytes_3 = sendCommandAndReceiveResponse("unknown_3","35070800e206020801010101");
-            std::vector<uint8_t> response_bytes_4 = sendCommandAndReceiveResponse("unknown_4","35070800d20c020801010101");
-            std::vector<uint8_t> response_bytes_5 = sendCommandAndReceiveResponse("unknown_5","350908008a070408011000");
-            //std::vector<uint8_t> response_bytes_6 = sendCommandAndReceiveResponse("unknown_6","35070800ca0c020801");
-            m_ppConn = NULL;
-
-            debug_dump_json(current_preset_response_bytes, "current_preset");
-            debug_dump_hex(response_bytes_1, "unknown_1");
-            debug_dump_hex(response_bytes_2, "unknown_2");
-            debug_dump_hex(response_bytes_3, "unknown_3");
-            debug_dump_hex(response_bytes_4, "unknown_4");
-            debug_dump_hex(response_bytes_5, "unknown_5");
-            //debug_dump_hex(response_bytes_6, "unknown_6");
-
-            return {decode_data(presetData),presetNames};
-        }
-
-        private:
-
-        std::vector<uint8_t> sendCommandAndReceiveResponse(
-            const char *command_description,
-            const char *command_hex_bytes
-        )
+        for(size_t i=1; i<=m_model.numberOfPresets(); ++i)
         {
-            Header header;
-            std::array<uint8_t, 16> headerBytes;
-            hexStringToArrayOf16Bytes(command_hex_bytes, headerBytes);
-            header.fromBytes(headerBytes);
-            const auto command = Packet<EmptyPayload>{header, EmptyPayload{}};
-
-            auto recieved = (*m_ppConn)->send(command.getBytes());
+            const auto loadCommand = this->serializePresetRequestCommand(i);
+            auto recieved = conn->send(loadCommand.getBytes());
 
             if(recieved==0)
             {
                 char exception_message[100];
                 snprintf(
                     exception_message,sizeof(exception_message),
-                    "Empty response to %s request",
-                    command_description
+                    "Empty response to request for preset %lu", i
                 );
                 throw CommunicationException(exception_message);
             }
 
-            const auto receivedData = receiveResponse((*m_ppConn), true);
+            const auto receivedData = receiveResponse(conn, true);
+            char presetFilename[20];
 
+            snprintf(presetFilename,sizeof(presetFilename),"preset%02lu",i);
             std::vector<uint8_t> response_bytes = extractResponsePayload_V3_USB(receivedData);
-
-            return response_bytes;
+            debug_dump_json(response_bytes, presetFilename);
         }
 
+        m_ppConn = &conn;
+        std::vector<uint8_t> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801");
+        std::vector<uint8_t> response_bytes_1 = sendCommandAndReceiveResponse("unknown_1","35070800f2030208010101");
+        std::vector<uint8_t> response_bytes_2 = sendCommandAndReceiveResponse("unknown_2","35070800d206020801010101");
+        std::vector<uint8_t> response_bytes_3 = sendCommandAndReceiveResponse("unknown_3","35070800e206020801010101");
+        std::vector<uint8_t> response_bytes_4 = sendCommandAndReceiveResponse("unknown_4","35070800d20c020801010101");
+        std::vector<uint8_t> response_bytes_5 = sendCommandAndReceiveResponse("unknown_5","350908008a070408011000");
+        //std::vector<uint8_t> response_bytes_6 = sendCommandAndReceiveResponse("unknown_6","35070800ca0c020801");
+        m_ppConn = NULL;
 
+        debug_dump_json(current_preset_response_bytes, "current_preset");
+        debug_dump_hex(response_bytes_1, "unknown_1");
+        debug_dump_hex(response_bytes_2, "unknown_2");
+        debug_dump_hex(response_bytes_3, "unknown_3");
+        debug_dump_hex(response_bytes_4, "unknown_4");
+        debug_dump_hex(response_bytes_5, "unknown_5");
+        //debug_dump_hex(response_bytes_6, "unknown_6");
 
-        Packet<EmptyPayload> serializePresetRequestCommand(int presetIndex)
+        return {decode_data(presetData),presetNames};
+    }
+
+    std::vector<uint8_t> MustangProtocolV3::sendCommandAndReceiveResponse(
+        const char *command_description,
+        const char *command_hex_bytes
+    )
+    {
+        Header header;
+        std::array<uint8_t, 16> headerBytes;
+        hexStringToArrayOf16Bytes(command_hex_bytes, headerBytes);
+        header.fromBytes(headerBytes);
+        const auto command = Packet<EmptyPayload>{header, EmptyPayload{}};
+
+        auto recieved = (*m_ppConn)->send(command.getBytes());
+
+        if(recieved==0)
         {
-            Packet<EmptyPayload> retval;
-            Header header2{};
-            std::string hexBytes2("35070800ca060208010110");
-            std::array<uint8_t, 16> header2Bytes;
-            hexStringToArrayOf16Bytes(hexBytes2, header2Bytes);
-            header2Bytes[8] = presetIndex;
-            header2.fromBytes(header2Bytes);
-            return Packet<EmptyPayload>{header2, EmptyPayload{}};
+            char exception_message[100];
+            snprintf(
+                exception_message,sizeof(exception_message),
+                "Empty response to %s request",
+                command_description
+            );
+            throw CommunicationException(exception_message);
         }
 
-        Packet<EmptyPayload> serializeNextRequestCommand(int index)
-        {
-            Packet<EmptyPayload> retval;
-            Header header{};
-            // "35:07:08:00:c2:06:02:08:01:
-            std::string hexBytes("35070800c206020801");
-            std::array<uint8_t, 16> headerBytes;
-            hexStringToArrayOf16Bytes(hexBytes, headerBytes);
-            headerBytes[8] = index;
-            header.fromBytes(headerBytes);
-            return Packet<EmptyPayload>{header, EmptyPayload{}};
-        }
-    };
+        const auto receivedData = receiveResponse((*m_ppConn), true);
+
+        std::vector<uint8_t> response_bytes = extractResponsePayload_V3_USB(receivedData);
+
+        return response_bytes;
+    }
+
+
+
+    Packet<EmptyPayload> MustangProtocolV3::serializePresetRequestCommand(int presetIndex)
+    {
+        Packet<EmptyPayload> retval;
+        Header header2{};
+        std::string hexBytes2("35070800ca060208010110");
+        std::array<uint8_t, 16> header2Bytes;
+        hexStringToArrayOf16Bytes(hexBytes2, header2Bytes);
+        header2Bytes[8] = presetIndex;
+        header2.fromBytes(header2Bytes);
+        return Packet<EmptyPayload>{header2, EmptyPayload{}};
+    }
+
+    Packet<EmptyPayload> MustangProtocolV3::serializeNextRequestCommand(int index)
+    {
+        Packet<EmptyPayload> retval;
+        Header header{};
+        // "35:07:08:00:c2:06:02:08:01:
+        std::string hexBytes("35070800c206020801");
+        std::array<uint8_t, 16> headerBytes;
+        hexStringToArrayOf16Bytes(hexBytes, headerBytes);
+        headerBytes[8] = index;
+        header.fromBytes(headerBytes);
+        return Packet<EmptyPayload>{header, EmptyPayload{}};
+    }
 } // end of namespace
-
-#if 0
-
-35:07:08:00:c2:06:02:08:01:3c:3b:3a
-35:07:08:00:f2:03:02:08:01:01:3c:3b:3a
-35:07:08:00:d2:06:02:08:01:01:01:3c:3b:3a
-35:07:08:00:e2:06:02:08:01:01:01:01:3c
-35:07:08:00:d2:0c:02:08:01:01:01
-35:09:08:00:8a:07:04:08:01:10:00
-35:07:08:00:ca:0c:02:08:01:
-35:07:08:00:ca:0c:02:08:01
-
-
-
-
-
-
-
-
-#endif
 
 // definitions of static helper functions
 

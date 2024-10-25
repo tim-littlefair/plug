@@ -2,7 +2,15 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-add_library(plug-mustang Mustang.cpp PacketSerializer.cpp Packet.cpp)
+add_library(plug-mustang
+    Mustang.cpp
+    PacketSerializer.cpp
+    Packet.cpp
+    #MustangProtocolBase.cpp
+    #MustangProtocolV1V2.cpp
+    MustangProtocolV3.cpp
+)
+
 add_library(plug-communication
     UsbComm.cpp
     ConnectionFactory.cpp
