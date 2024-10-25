@@ -7,7 +7,7 @@ add_library(plug-mustang
     PacketSerializer.cpp
     Packet.cpp
     MustangProtocolBase.cpp
-    #MustangProtocolV1V2.cpp
+    MustangProtocolV1V2.cpp
     MustangProtocolV3.cpp
 )
 

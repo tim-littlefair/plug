@@ -41,62 +41,13 @@ namespace plug::com
 
         public:
 
-        MustangProtocolV1V2(DeviceModel model):
-        MustangProtocolBase(model)
-        {
+        MustangProtocolV1V2(DeviceModel model);
 
-        };
+        std::array<Packet<EmptyPayload>,2> serializeInitCommand();
 
-        std::array<Packet<EmptyPayload>,2> serializeInitCommand()
-        {
-            return plug::com::serializeInitCommand();
-        }
+        Packet<EmptyPayload> serializeV1V2LoadCommand();
 
-        Packet<EmptyPayload> serializeV1V2LoadCommand()
-        {
-            return plug::com::serializeLoadCommand();
-        }
-
-        InitialData loadPresetData(const std::shared_ptr<Connection> conn)
-        {
-            std::vector<std::array<std::uint8_t, 64>> recieved_data;
-
-            const auto loadCommand = this->serializeV1V2LoadCommand();
-            auto recieved = conn->send(loadCommand.getBytes());
-#if 0
-            while (recieved != 0)
-            {
-                const auto recvData = receivePacket(*conn);
-                recieved = recvData.size();
-                PacketRawType p{};
-                std::copy(recvData.cbegin(), recvData.cend(), p.begin());
-                recieved_data.push_back(p);
-            }
-#else
-            // This call tries to be exactly equivalent to the old
-            // implementation.  Pass 'true' instead of 'false' if the end
-            // of the response can be detected by checking for value 0x35
-            // in the second byte of each packet.
-            if(recieved != 0)
-            {
-                recieved_data = receiveResponse(conn,false);
-            }
-#endif
-            const std::size_t numPresetPackets = m_model.numberOfPresets() > 0 ? (m_model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
-            std::vector<Packet<NamePayload>> presetListData;
-            presetListData.reserve(numPresetPackets);
-            std::transform(recieved_data.cbegin(), std::next(recieved_data.cbegin(), numPresetPackets), std::back_inserter(presetListData), [](const auto& p)
-                        {
-                Packet<NamePayload> packet{};
-                packet.fromBytes(p);
-                return packet; });
-            auto presetNames = decodePresetListFromData(presetListData);
-
-            std::array<PacketRawType, 7> presetData{{}};
-            std::copy(std::next(recieved_data.cbegin(), numPresetPackets), std::next(recieved_data.cbegin(), numPresetPackets + 7), presetData.begin());
-
-            return {decode_data(presetData), presetNames};
-        }
+        InitialData loadPresetData(const std::shared_ptr<Connection> conn);
     };
 }
 
