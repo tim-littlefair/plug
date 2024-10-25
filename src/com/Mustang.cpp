@@ -24,11 +24,7 @@
 #include "com/CommunicationException.h"
 #include "com/Packet.h"
 
-
-// TODO: Tidy up the protocol classes
-#define INSTANTIATE_PROTOCOL_FACTORY_HERE
 #include "com/MustangProtocolBase.h"
-#undef INSTANTIATE_PROTOCOL_FACTORY_HERE
 
 #include <algorithm>
 

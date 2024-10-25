@@ -21,7 +21,7 @@
 
 #include "com/MustangProtocolV3.h"
 
-#include "com/MustangProtocolV1V2.h"
+#include "com/Mustang.h"
 
 #include <algorithm>
 

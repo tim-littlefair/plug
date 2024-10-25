@@ -24,6 +24,7 @@
 #include "SignalChain.h"
 #include "DeviceModel.h"
 #include "com/Connection.h"
+#include "com/Packet.h"
 #include <string_view>
 #include <vector>
 #include <memory>
@@ -36,6 +37,8 @@ namespace plug::com
         SignalChain signalChain;
         std::vector<std::string> presetNames;
     };
+
+    SignalChain decode_data(const std::array<PacketRawType, 7>& data);
 
     class MustangProtocolBase;
 

@@ -33,9 +33,6 @@
 
 namespace plug::com
 {
-    // Declarations of helper functions used by the V1V2 protocol - these are implemented in Mustang.cpp
-    SignalChain decode_data(const std::array<PacketRawType, 7>& data);
-
     class MustangProtocolV1V2: public MustangProtocolBase
     {
 
