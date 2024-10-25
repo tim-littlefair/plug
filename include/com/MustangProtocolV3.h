@@ -28,8 +28,11 @@
 #include "com/Packet.h"
 
 #include <algorithm>
-#include <fstream>
+
 #include <iostream>
+#include <iomanip>
+#include <fstream>
+
 #include <cassert>
 
 #include <qt6/QtCore/QJsonParseError>
@@ -118,12 +121,12 @@ namespace plug::com
 
             m_ppConn = &conn;
             std::vector<uint8_t> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801");
-            std::vector<uint8_t> response_bytes_1 = sendCommandAndReceiveResponse("unknown_1","35070800f203020801");
-            std::vector<uint8_t> response_bytes_2 = sendCommandAndReceiveResponse("unknown_2","35070800d206020801");
-            std::vector<uint8_t> response_bytes_3 = sendCommandAndReceiveResponse("unknown_3","35070800e206020801");
-            std::vector<uint8_t> response_bytes_4 = sendCommandAndReceiveResponse("unknown_4","35070800d20c020801");
-            std::vector<uint8_t> response_bytes_5 = sendCommandAndReceiveResponse("unknown_5","350908008a07040801");
-            std::vector<uint8_t> response_bytes_6 = sendCommandAndReceiveResponse("unknown_6","35070800ca0c020801");
+            std::vector<uint8_t> response_bytes_1 = sendCommandAndReceiveResponse("unknown_1","35070800f2030208010101");
+            std::vector<uint8_t> response_bytes_2 = sendCommandAndReceiveResponse("unknown_2","35070800d206020801010101");
+            std::vector<uint8_t> response_bytes_3 = sendCommandAndReceiveResponse("unknown_3","35070800e206020801010101");
+            std::vector<uint8_t> response_bytes_4 = sendCommandAndReceiveResponse("unknown_4","35070800d20c020801010101");
+            std::vector<uint8_t> response_bytes_5 = sendCommandAndReceiveResponse("unknown_5","350908008a070408011000");
+            //std::vector<uint8_t> response_bytes_6 = sendCommandAndReceiveResponse("unknown_6","35070800ca0c020801");
             m_ppConn = NULL;
 
             debug_dump_json(current_preset_response_bytes, "current_preset");
@@ -132,7 +135,7 @@ namespace plug::com
             debug_dump_hex(response_bytes_3, "unknown_3");
             debug_dump_hex(response_bytes_4, "unknown_4");
             debug_dump_hex(response_bytes_5, "unknown_5");
-            debug_dump_hex(response_bytes_6, "unknown_6");
+            //debug_dump_hex(response_bytes_6, "unknown_6");
 
             return {decode_data(presetData),presetNames};
         }
@@ -258,7 +261,7 @@ static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com:
             case 0x33:  // first frame of response
                 // p[3] appears to hold number of bytes to be consumed
                 // before JSON starts
-                json_start_offset+= p[3] + 1;
+                json_start_offset+= (p[3] + 1);
                 json_length -= ( p[3] + 1 ) ;
                 break;
 
@@ -266,11 +269,11 @@ static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com:
                 json_start_offset = 3;
                 break;
 
-
             case 0x35: // last frame of response
                 json_start_offset = 3;
-                json_length -= 1;
+                json_length -= 1; // terminating null?
                 break;
+
 
             default:
                 json_start_offset = 3;
@@ -302,11 +305,17 @@ static void debug_dump_json(std::vector<uint8_t> retval, const std::string& labe
     QByteArray jsonQByteArray(jsonNullTerminatedCharString,retval.size()-1);
     QJsonParseError parseError;
     QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonQByteArray, &parseError);
+    if(parseError.error==14)
+    {
+        // valid JSON followed by extra stuff - reparse to the end of the valid JSON
+        QByteArray jsonQByteArray2(jsonNullTerminatedCharString,parseError.offset);
+        jsonDocument = QJsonDocument::fromJson(jsonQByteArray2, &parseError);
+    }
+
     if(jsonDocument.isNull())
     {
         json_dump_stream << "JSON parse error of type " << parseError.error
                             << " at offset " << parseError.offset  << std::endl << std::endl;
-        json_dump_stream.write(jsonNullTerminatedCharString, retval.size()-1);
     }
     else
     {
@@ -325,13 +334,17 @@ static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label
     hex_dump_fname.append(".hex");
     std::ofstream hex_dump_stream(hex_dump_fname);
 
+    std::string raw_dump_fname = label;
+    raw_dump_fname.append(".raw");
+    std::ofstream raw_dump_stream(raw_dump_fname);
+
     size_t hex_line_offset = 0;
     while(hex_line_offset<retval.size())
     {
         std::ostringstream line_hex_string;
-        line_hex_string.setf(std::ios::hex,std::ios::dec);
-        line_hex_string.width(2);
-        line_hex_string.fill('0');
+        line_hex_string << std::hex << std::setfill('0');
+        //line_hex_string.width(2);
+        //line_hex_string.fill('0');
         std::ostringstream line_char_string;
         for(size_t line_byte_index = 0; line_byte_index<16; ++line_byte_index)
         {
@@ -343,7 +356,7 @@ static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label
                 continue;
             }
             uint8_t byte_value = retval[vector_byte_offset];
-            line_hex_string << " " << static_cast<unsigned int>(byte_value);
+            line_hex_string << " " << std::setw(2) << static_cast<unsigned int>(byte_value);
             if( (byte_value>=0x20) && (byte_value < 0x80) )
             {
                 line_char_string << static_cast<char>(byte_value);
@@ -352,11 +365,14 @@ static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label
             {
                 line_char_string << '.';
             }
+            raw_dump_stream << static_cast<char>(byte_value);
         }
         //line_hex_string << std::ends;
         //line_char_string << std::ends;
         hex_dump_stream << line_hex_string.str() << "   " << line_char_string.str() << std::endl;
         hex_line_offset += 16;
     }
+    raw_dump_stream.close();
+    hex_dump_stream.close();
 #endif
 }
