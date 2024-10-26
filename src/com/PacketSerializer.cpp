@@ -318,6 +318,12 @@ namespace plug::com
                 payload.setModel(0xff);
                 payload.setUnknownAmpSpecific(0x11, 0x11, 0x11, 0x11, 0x00);
                 break;
+
+            case amps::MUSTANG_V3_AMP_NOT_IDENTIFIED:
+                payload.setModel(0xaf);
+                payload.setUnknownAmpSpecific(0xaf, 0xaf, 0xaf, 0xaf, 0xaf);
+                break;
+
         }
 
         return Packet<AmpPayload>{header, payload};

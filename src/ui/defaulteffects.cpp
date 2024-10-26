@@ -22,6 +22,9 @@
 #include "ui/defaulteffects.h"
 #include "ui/mainwindow.h"
 #include "ui_defaulteffects.h"
+
+#include "com/CommunicationException.h"
+
 #include <QSettings>
 #include <array>
 
@@ -1147,6 +1150,11 @@ namespace plug
                              tr("Disabled box"),
                              tr("This box is disabled in this effect")});
                 break;
+
+                case effects::MUSTANG_V3_EFFECT_NOT_IDENTIFIED:
+                default:
+                    throw plug::com::CommunicationException("Attempt to save settings with unknown effect");
+
         }
     }
 

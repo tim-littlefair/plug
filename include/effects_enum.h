@@ -47,7 +47,10 @@ namespace plug
         FENDER_57_TWIN,
         FENDER_60_THRIFT,
         BRITISH_COLOUR,
-        BRITISH_WATTS
+        BRITISH_WATTS,
+
+        // Mustang v3
+        MUSTANG_V3_AMP_NOT_IDENTIFIED = 99,
     };
 
     constexpr bool isV2Amp(amps amp)
@@ -108,7 +111,9 @@ namespace plug
         AMBIENT_REVERB,
         ARENA_REVERB,
         FENDER_63_SPRING_REVERB,
-        FENDER_65_SPRING_REVERB
+        FENDER_65_SPRING_REVERB,
+
+        MUSTANG_V3_EFFECT_NOT_IDENTIFIED = 99,
     };
 
     // list of all cabinets
