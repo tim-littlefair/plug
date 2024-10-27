@@ -50,6 +50,19 @@ namespace plug
             {amps::BRITISH_WATTS, "British Watts"}};
     }
 
+    static std::string ampNameLookup(amps ampId)
+    {
+        auto ampNameIterator = ampNames.find(ampId);
+        if (ampNameIterator != ampNames.end())
+        {
+            return ampNameIterator->second;
+        }
+        else
+        {
+            return "Unknown amp";
+        }
+    }
+
     Amplifier::Amplifier(QWidget* parent)
         : QMainWindow(parent),
           ui(std::make_unique<Ui::Amplifier>()),
@@ -209,7 +222,7 @@ namespace plug
         amp_num = static_cast<amps>(ampValue);
         changed = true;
 
-        const auto title = QString::fromStdString("Amplifier: " + ampNames.at(amp_num));
+        const auto title = QString::fromStdString("Amplifier: " + ampNameLookup(amp_num));
         setWindowTitle(title);
         setAccessibleName(title);
 
