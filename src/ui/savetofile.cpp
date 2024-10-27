@@ -22,9 +22,6 @@
 #include "ui/savetofile.h"
 #include "ui/mainwindow.h"
 #include "ui_savetofile.h"
-
-#include "com/CommunicationException.h"
-
 #include <QFileDialog>
 #include <QMessageBox>
 
@@ -209,11 +206,6 @@ namespace plug
                 something = 0x11;
                 something2 = 0x00;
                 break;
-
-            case amps::MUSTANG_V3_AMP_NOT_IDENTIFIED:
-            default:
-                throw plug::com::CommunicationException("Attempt to save settings with unknown amp");
-
         }
 
         xml->writeStartElement("Amplifier");
@@ -540,11 +532,6 @@ namespace plug
             case effects::FENDER_65_SPRING_REVERB:
                 model = 0x0b;
                 break;
-
-            case effects::MUSTANG_V3_EFFECT_NOT_IDENTIFIED:
-            default:
-                throw plug::com::CommunicationException("Attempt to save settings with unknown amp");
-
         }
 
         xml->writeStartElement("Module");

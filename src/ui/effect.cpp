@@ -22,9 +22,6 @@
 #include "ui/effect.h"
 #include "ui/mainwindow.h"
 #include "ui_effect.h"
-
-#include "com/CommunicationException.h"
-
 #include <QShortcut>
 #include <QSettings>
 
@@ -513,10 +510,6 @@ namespace plug
             case effects::FENDER_65_SPRING_REVERB:
                 setTitleTexts(slot.id(), "Fender '65 Spring Reverb");
                 break;
-
-            case effects::MUSTANG_V3_EFFECT_NOT_IDENTIFIED:
-            default:
-                throw plug::com::CommunicationException("Attempt to save settings with unknown effect");
         }
 
         // set knobs labels and accessibility informations
@@ -1548,11 +1541,6 @@ namespace plug
                              tr("Disabled box"),
                              tr("This box is disabled in this effect")});
                 break;
-
-                case effects::MUSTANG_V3_EFFECT_NOT_IDENTIFIED:
-                default:
-                    throw plug::com::CommunicationException("Attempt to save settings with unknown effect");
-
         }
 
         if (settings.value("Settings/defaultEffectValues").toBool())
@@ -1660,11 +1648,6 @@ namespace plug
                 case effects::FENDER_65_SPRING_REVERB:
                     setDialValues(0x80, 0x8b, 0x49, 0xff, 0x80, 0x00);
                     break;
-
-                case effects::MUSTANG_V3_EFFECT_NOT_IDENTIFIED:
-                default:
-                    throw plug::com::CommunicationException("Attempt to save settings with unknown effect");
-
             }
         }
     }

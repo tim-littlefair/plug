@@ -35,19 +35,12 @@
 #include <qt6/QtCore/QByteArray>
 #include <qt6/QtCore/QJsonParseError>
 #include <qt6/QtCore/QString>
-#include <qt6/QtCore/QJsonObject>
 
 // Forward declarations of helper functions
 // definitions of these are at the end of the file, after the namespace closes
 static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outHeaderBytes);
 static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets);
-static void parse_preset_json(
-    std::vector<uint8_t> response_bytes,
-    const std::string& label,
-    std::string& presetName,
-    plug::amp_settings& presetAmpSettings,
-    std::vector<plug::fx_pedal_settings>& presetEffects
-);
+static void debug_dump_json(std::vector<uint8_t> retval, const std::string& label);
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label);
 
 namespace plug::com
@@ -82,28 +75,60 @@ namespace plug::com
 
     InitialData MustangProtocolV3::loadPresetData(const std::shared_ptr<Connection> conn)
     {
+        std::array<PacketRawType, 7> presetData{{}};
+#if 0
+    const auto name = decodeNameFromData(fromRawData<NamePayload>(data[0]));
+    const auto amp = decodeAmpFromData(fromRawData<AmpPayload>(data[1]), fromRawData<AmpPayload>(data[6]));
+    const auto effects = decodeEffectsFromData({{fromRawData<EffectPayload>(data[2]), fromRawData<EffectPayload>(data[3]),
+                                                    fromRawData<EffectPayload>(data[4]), fromRawData<EffectPayload>(data[5])}});
+
+    return SignalChain{name, amp, effects};
+#endif
+
+        std::vector<std::string>presetNames;
+
+        for(size_t i=1; i<=m_model.numberOfPresets(); ++i)
+        {
+            const auto loadCommand = this->serializePresetRequestCommand(i);
+            auto recieved = conn->send(loadCommand.getBytes());
+
+            if(recieved==0)
+            {
+                char exception_message[100];
+                snprintf(
+                    exception_message,sizeof(exception_message),
+                    "Empty response to request for preset %lu", i
+                );
+                throw CommunicationException(exception_message);
+            }
+
+            const auto receivedData = receiveResponse(conn, true);
+            char presetFilename[20];
+
+            snprintf(presetFilename,sizeof(presetFilename),"preset%02lu",i);
+            std::vector<uint8_t> response_bytes = extractResponsePayload_V3_USB(receivedData);
+            debug_dump_json(response_bytes, presetFilename);
+        }
+
         m_ppConn = &conn;
         std::vector<uint8_t> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801");
-        debug_dump_hex(current_preset_response_bytes,"current_preset");
+        std::vector<uint8_t> response_bytes_1 = sendCommandAndReceiveResponse("unknown_1","35070800f2030208010101");
+        std::vector<uint8_t> response_bytes_2 = sendCommandAndReceiveResponse("unknown_2","35070800d206020801010101");
+        std::vector<uint8_t> response_bytes_3 = sendCommandAndReceiveResponse("unknown_3","35070800e206020801010101");
+        std::vector<uint8_t> response_bytes_4 = sendCommandAndReceiveResponse("unknown_4","35070800d20c020801010101");
+        std::vector<uint8_t> response_bytes_5 = sendCommandAndReceiveResponse("unknown_5","350908008a070408011000");
+        //std::vector<uint8_t> response_bytes_6 = sendCommandAndReceiveResponse("unknown_6","35070800ca0c020801");
         m_ppConn = NULL;
-        std::string currentPresetName;
 
-        std::vector<std::string> presetNames;
-        amp_settings presetAmpSettings;
-        std::vector<plug::fx_pedal_settings> presetEffects;
-        for(int i=1; i<=60; ++i)
-        {
-            presetNames.push_back("x");
-        }
-        for(int i=1; i<=8; ++i)
-        {
-            fx_pedal_settings ps{FxSlot{0}, effects::EMPTY, 0, 0, 0, 0, 0, 0, false};
-            presetEffects.push_back(ps);
-        }
+        debug_dump_json(current_preset_response_bytes, "current_preset");
+        debug_dump_hex(response_bytes_1, "unknown_1");
+        debug_dump_hex(response_bytes_2, "unknown_2");
+        debug_dump_hex(response_bytes_3, "unknown_3");
+        debug_dump_hex(response_bytes_4, "unknown_4");
+        debug_dump_hex(response_bytes_5, "unknown_5");
+        //debug_dump_hex(response_bytes_6, "unknown_6");
 
-        parse_preset_json(current_preset_response_bytes, "current_preset", currentPresetName, presetAmpSettings, presetEffects);
-
-        return InitialData{SignalChain{currentPresetName, presetAmpSettings, presetEffects},presetNames};
+        return {decode_data(presetData),presetNames};
     }
 
     std::vector<uint8_t> MustangProtocolV3::sendCommandAndReceiveResponse(
@@ -235,21 +260,17 @@ static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com:
     return retval;
 }
 
-static void parse_preset_json(
-    std::vector<uint8_t> response_bytes,
-    const std::string& label,
-    std::string& presetName,
-    plug::amp_settings& presetAmpSettings,
-    std::vector<plug::fx_pedal_settings>& presetEffects
-){
+static void debug_dump_json(std::vector<uint8_t> retval, const std::string& label)
+{
+#ifndef NDEBUG
     std::string json_dump_fname = label;
     json_dump_fname.append(".json");
     std::ofstream json_dump_stream(json_dump_fname);
 
-    const char* jsonNullTerminatedCharString = reinterpret_cast<const char*>(&(response_bytes.at(0)));
+    const char* jsonNullTerminatedCharString = reinterpret_cast<const char*>(&(retval.at(0)));
 
 
-    QByteArray jsonQByteArray(jsonNullTerminatedCharString,response_bytes.size()-1);
+    QByteArray jsonQByteArray(jsonNullTerminatedCharString,retval.size()-1);
     QJsonParseError parseError;
     QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonQByteArray, &parseError);
     if(parseError.error==14)
@@ -263,20 +284,15 @@ static void parse_preset_json(
     {
         json_dump_stream << "JSON parse error of type " << parseError.error
                             << " at offset " << parseError.offset  << std::endl << std::endl;
-        return;
     }
-
-#ifndef NDEBUG
+    else
+    {
         // dump a human-readable indented rendering of the single-line JSON retrieved from packets
-    json_dump_stream << jsonDocument.toJson(QJsonDocument::Indented).data() << std::endl;
+        json_dump_stream << jsonDocument.toJson(QJsonDocument::Indented).data() << std::endl;
+    }
     json_dump_stream.flush();
     json_dump_stream.close();
 #endif
-
-    QString qName = jsonDocument.object().value(QStringLiteral("info")).toObject().value(QStringLiteral("displayName")).toString();
-    presetName = qPrintable(qName);
-    presetAmpSettings.amp_num = plug::amps::MUSTANG_V3_AMP_NOT_IDENTIFIED;
-    assert(presetEffects.size()>=1);
 }
 
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label)
