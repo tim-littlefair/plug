@@ -40,7 +40,7 @@
 // Forward declarations of helper functions
 // definitions of these are at the end of the file, after the namespace closes
 static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outHeaderBytes);
-static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets);
+static std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets, int& fender_message_type);
 static void parse_preset_json(
     std::vector<uint8_t> response_bytes,
     const std::string& label,
@@ -49,6 +49,8 @@ static void parse_preset_json(
     std::vector<plug::fx_pedal_settings>& presetEffects
 );
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label);
+static std::vector<uint8_t> array64_to_vector(std::array<uint8_t,64> a);
+static unsigned int protobuf_read_varint(std::vector<uint8_t>p, size_t& protobuf_read_offset);
 
 namespace plug::com
 {
@@ -83,8 +85,9 @@ namespace plug::com
     InitialData MustangProtocolV3::loadPresetData(const std::shared_ptr<Connection> conn)
     {
         m_ppConn = &conn;
-        std::vector<uint8_t> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801");
-        debug_dump_hex(current_preset_response_bytes,"current_preset");
+        int response_type_received;
+        std::vector<std::vector<uint8_t>> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801", response_type_received);
+        debug_dump_hex(current_preset_response_bytes[0],"current_preset");
         m_ppConn = NULL;
         std::string currentPresetName;
 
@@ -102,14 +105,15 @@ namespace plug::com
             presetEffects.push_back(ps);
         }
 
-        parse_preset_json(current_preset_response_bytes, "current_preset", currentPresetName, presetAmpSettings, presetEffects);
+        parse_preset_json(current_preset_response_bytes[1], "current_preset", currentPresetName, presetAmpSettings, presetEffects);
 
         return InitialData{SignalChain{currentPresetName, presetAmpSettings, presetEffects},presetNames};
     }
 
-    std::vector<uint8_t> MustangProtocolV3::sendCommandAndReceiveResponse(
+    std::vector<std::vector<uint8_t>> MustangProtocolV3::sendCommandAndReceiveResponse(
         const char *command_description,
-        const char *command_hex_bytes
+        const char *command_hex_bytes,
+        int& response_message_type
     )
     {
         Header header;
@@ -133,9 +137,9 @@ namespace plug::com
 
         const auto receivedData = receiveResponse((*m_ppConn), true);
 
-        std::vector<uint8_t> response_bytes = extractResponsePayload_V3_USB(receivedData);
+        auto response_fields = extractResponsePayload_V3_USB(receivedData, response_message_type);
 
-        return response_bytes;
+        return response_fields;
     }
 
 
@@ -188,23 +192,60 @@ static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array
 
 }
 
-static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets) {
-    std::vector<uint8_t> retval = std::vector<uint8_t>();
+/* This function returns a vector of vectors of bytes
+ * element 0 is the whole protobuf std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets)
+ * elements 1.. are the top-level fields of the response
+ */
+static std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets, int& fender_message_type)
+{
+    std::vector<std::vector<uint8_t>> retval;
+    retval.push_back(std::vector<uint8_t>());
+
+    // See https://github.com/brentmaxwell/LtAmp/blob/d62fd958cebe231723b160b1d53814754ffe9fbb/Schema/protobuf/FenderMessageLT.proto#L75
+    fender_message_type = -1;
+    size_t protobuf_read_offset = -1;
+
     for (size_t i=0; i<packets.size(); ++i)
     {
         plug::com::PacketRawType p = packets.at(i);
-        int json_start_offset =3;
-        int json_length = p[2];
 
+        if(fender_message_type==-1)
+        {
+            // first frame
+            // May or may not be the last frame too
+
+            // Refer to
+            // https://protobuf.dev/programming-guides/encoding/#structure
+            // for information about protobuf types and their encoding
+            assert(p[3]==0x08); // magic number for protobuf
+            assert(p[4]==0x02); // always protobuf v2
+            protobuf_read_offset = 5;
+            // protobuf requires that the next item in the stream is the
+            // 'tag' of the message structure, which is a variable-length-encoded integer
+            // which combines the protobuf type of the message in the three least
+            // significant bits with a magic number assigned for the message
+            // in higher bits
+            unsigned int fender_message_tag = protobuf_read_varint(array64_to_vector(p), protobuf_read_offset);
+            assert( (fender_message_tag & 0x07) == 2); // protobuf type of whole message is 'LEN'
+            fender_message_type = protobuf_read_offset + (fender_message_tag >> 3);
+        }
+        assert(fender_message_type!=-1);
+
+#if 0
         // p[0] is always 0
-        // p[1] is frame type
-        // p[2] is signficant data in frame (after p[2])
-
+        // p[1] is frame type (0x33=first-of-many, 0x34=middle-of-many, 0x35=last-of-one-or-many)
+        // p[2] is length of signficant data in this packet (after p[2])
+        // The rest of the packet is the whole or a fragment of a protobuf message,
+        // which may wrap a JSON jsonDocument
         switch (p[1])
         {
-            case 0x33:  // first frame of response
-                // p[3] appears to hold number of bytes to be consumed
-                // before JSON starts
+            case 0x33:
+
+                // p[3] appears to hold number of bytes of raw data to be consumed
+                for (int j=0; j<=p[3]; ++j)
+                {
+                    preamble.push_back(p[3+j]);
+                }
                 json_start_offset+= (p[3] + 1);
                 json_length -= ( p[3] + 1 ) ;
                 break;
@@ -215,7 +256,15 @@ static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com:
 
             case 0x35: // last frame of response
                 json_start_offset = 3;
-                json_length -= 1; // terminating null?
+                //json_length -= 1; // terminating null?
+                // p[3] appears to hold number of bytes of raw data to be consumed
+                for (int j=0; j<=p[3]; ++j)
+                {
+                    preamble.push_back(p[json_start_offset + json_length + j]);
+                }
+                json_start_offset+= (p[3] + 1);
+                json_length -= ( p[3] + 1 ) ;
+
                 break;
 
 
@@ -224,15 +273,51 @@ static std::vector<uint8_t> extractResponsePayload_V3_USB(std::vector<plug::com:
                 json_length=0;
                 continue;
         }
-
-        std::cout << "i=" << i << " p1[1:2]=" << static_cast<unsigned int>(p[1]) << " " << static_cast<unsigned int>(p[2]) << " " << json_start_offset << " " << json_length << std::endl;
+#endif
+        int pb_start_offset = 3;
+        int pb_length = p[2];
 
         std::copy(
-            p.cbegin() + json_start_offset,
-            p.cbegin() + json_start_offset + json_length,
-            std::back_inserter(retval)
+            p.cbegin() + pb_start_offset,
+            p.cbegin() + pb_start_offset + pb_length,
+            std::back_inserter(retval[0])
         );
     }
+    std::ofstream raw_dump_stream("response.raw");
+    for (size_t i = 0; i<retval[0].size(); ++i)
+    {
+        raw_dump_stream << static_cast<char>(retval[0][i]);
+    }
+    raw_dump_stream.close();
+
+    do
+    {
+        unsigned int next_field_length = protobuf_read_varint(retval[0],protobuf_read_offset);
+        //unsigned int next_field_tag = protobuf_read_varint(retval[0],protobuf_read_offset);
+        unsigned int next_field_type = 2; //next_field_tag & 0x07;
+        switch(next_field_type)
+        {
+            case 2: // length in varint followed by sequence of bytes
+                {
+                    std::vector<uint8_t> next_field_bytes;
+                    std::copy(
+                        retval[0].cbegin() + protobuf_read_offset,
+                        retval[0].cbegin() + protobuf_read_offset + next_field_length,
+                        std::back_inserter(next_field_bytes)
+                    );
+                    protobuf_read_offset += next_field_length;
+                    retval.push_back(next_field_bytes);
+                }
+                next_field_type = 0;
+                break;
+
+            default:
+                // For the moment we are only interested in the first field.
+                // and only if it is of type LEN
+                protobuf_read_offset = retval[0].size();
+        }
+    } while(protobuf_read_offset<retval[0].size());
+
     return retval;
 }
 
@@ -247,6 +332,7 @@ static void parse_preset_json(
     json_dump_fname.append(".json");
     std::ofstream json_dump_stream(json_dump_fname);
 
+    response_bytes.push_back(static_cast<uint8_t>(0));
     const char* jsonNullTerminatedCharString = reinterpret_cast<const char*>(&(response_bytes.at(0)));
 
 
@@ -275,6 +361,7 @@ static void parse_preset_json(
 #endif
 
     QString qName = jsonDocument.object().value(QStringLiteral("info")).toObject().value(QStringLiteral("displayName")).toString();
+
     presetName = qPrintable(qName);
     presetAmpSettings.amp_num = plug::amps::STUDIO_PREAMP;
     assert(presetEffects.size()>=1);
@@ -329,3 +416,66 @@ static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label
     hex_dump_stream.close();
 #endif
 }
+
+static std::vector<uint8_t> array64_to_vector(std::array<uint8_t,64> a)
+{
+    std::vector<uint8_t> v;
+    std::copy(a.cbegin(),a.cend(),std::back_inserter(v));
+    return v;
+}
+
+static unsigned int protobuf_read_varint(std::vector<uint8_t> p, size_t& protobuf_read_offset)
+{
+    unsigned int retval=0;
+    unsigned int multiplier = 1;
+    do
+    {
+        uint8_t next_byte = p[protobuf_read_offset];
+        ++protobuf_read_offset;
+        if( (next_byte&0x80) == 0 )
+        {
+            retval += next_byte * multiplier;
+            break;
+        }
+        else
+        {
+            retval += (next_byte&0x7F) * multiplier;
+            multiplier *= 128;
+        }
+    } while(true);
+    return retval;
+}
+
+#if 0
+"FenderId": ,
+"FenderId": ,
+"FenderId": "",
+"FenderId": "DUBS_Excelsior",
+"FenderId": "DUBS_LinearGain",
+"FenderId": "DUBS_Or120",
+"FenderId": "",
+"FenderId": "DUBS_Silvertone",
+"FenderId": ,
+"FenderId": ,
+
+// Names here are copied from brentmaxwell's C# work at
+// https://github.com/brentmaxwell/LtAmp/blob/d62fd958cebe231723b160b1d53814754ffe9fbb/LtAmpDotNet/LtAmpDotNet.Lib/Model/Preset/Node.cs#L74
+static const std::map<std::string, plug::amps> json_amp_names {
+            {"DUBS_Deluxe57", plug::amps::FENDER_57_DELUXE},
+            {"Fender '59 Bassman", plug::amps::FENDER_59_BASSMAN },
+            {"DUBS_Champ57", plug::amps::FENDER_57_CHAMP},
+            {"DUBS_Deluxe65", plug::amps::FENDER_65_DELUXE_REVERB },
+            {"DUBS_Princeton65", plug::amps::FENDER_65_PRINCETON, },
+            {"DUBS_Twin65", plug::amps::FENDER_65_TWIN_REVERB},
+            {"DUBS_SuperSonic", plug::amps::FENDER_SUPER_SONIC},
+            {"DUBS_Ac30Tb", plug::amps::BRITISH_60S},
+            {"DUBS_DR103", plug::amps::BRITISH_70S},
+            {amps::BRITISH_80S, "British 80's"},
+            {amps::AMERICAN_90S, "American 90's"},
+            {"DUBS_Evh3",plug::amps::METAL_2000},
+            {amps::STUDIO_PREAMP, "Studio Preamp"},
+            {"DUBS_Twin57", plug::amps::FENDER_57_TWIN},
+            {amps::FENDER_60_THRIFT, "Fender '60s Thrift"},
+            {amps::BRITISH_COLOUR, "British Colour"},
+            {amps::BRITISH_WATTS, "British Watts"}};
+#endif

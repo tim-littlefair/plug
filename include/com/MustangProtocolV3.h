@@ -43,9 +43,10 @@ namespace plug::com
 
         private:
 
-        std::vector<uint8_t> sendCommandAndReceiveResponse(
+        std::vector<std::vector<uint8_t>> sendCommandAndReceiveResponse(
             const char *command_description,
-            const char *command_hex_bytes
+            const char *command_hex_bytes,
+            int& fender_message_type
         );
 
         Packet<EmptyPayload> serializePresetRequestCommand(int presetIndex);
