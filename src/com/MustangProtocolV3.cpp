@@ -35,7 +35,9 @@
 #include <qt6/QtCore/QByteArray>
 #include <qt6/QtCore/QJsonParseError>
 #include <qt6/QtCore/QString>
+#include <qt6/QtCore/QStringLiteral>
 #include <qt6/QtCore/QJsonObject>
+#include <qt6/QtCore/QJsonArray>
 
 // Forward declarations of helper functions
 // definitions of these are at the end of the file, after the namespace closes
@@ -51,6 +53,7 @@ static void parse_preset_json(
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label);
 static std::vector<uint8_t> array64_to_vector(std::array<uint8_t,64> a);
 static unsigned int protobuf_read_varint(std::vector<uint8_t>p, size_t& protobuf_read_offset);
+static const plug::amps* jsonNameToAmpId(std::string jsonName);
 
 namespace plug::com
 {
@@ -363,6 +366,32 @@ static void parse_preset_json(
     QString qName = jsonDocument.object().value(QStringLiteral("info")).toObject().value(QStringLiteral("displayName")).toString();
 
     presetName = qPrintable(qName);
+    QJsonArray audioGraphNodes = jsonDocument.object().value(QStringLiteral("audioGraph")).toObject().value(QStringLiteral("nodes")).toArray();
+    for(qsizetype i=0; i<audioGraphNodes.count(); ++i)
+    {
+        auto node = audioGraphNodes[i].toObject();
+        QString nodeFenderId = qPrintable(node.value(QStringLiteral("nodeFenderId")).toString());
+        auto pAmpId = jsonNameToAmpId(std::string(qPrintable(nodeFenderId)));
+        if(pAmpId != NULL)
+        {
+            presetAmpSettings.amp_num = *pAmpId;
+            presetAmpSettings.bass = node.value(QStringLiteral("bass")).toDouble();
+            presetAmpSettings.bias = node.value(QStringLiteral("bias")).toInt();
+/*
+            //presentAmpSettings.brightness = node.value(QStringLiteral("brightness")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+*/
+        }
+
+    }
     presetAmpSettings.amp_num = plug::amps::STUDIO_PREAMP;
     assert(presetEffects.size()>=1);
 }
@@ -460,9 +489,34 @@ static unsigned int protobuf_read_varint(std::vector<uint8_t> p, size_t& protobu
 
 // Names here are copied from brentmaxwell's C# work at
 // https://github.com/brentmaxwell/LtAmp/blob/d62fd958cebe231723b160b1d53814754ffe9fbb/LtAmpDotNet/LtAmpDotNet.Lib/Model/Preset/Node.cs#L74
+/*
+        DBUS_LinearGain,  //SUPER CLEAN
+        DUBS_Excelsior,   //EXCELSIOR
+        DUBS_Silvertone,  //SMALLTONE
+        DUBS_Or120,       //DOOM METAL
+        DUBS_Plexi87,     //70S ROCK
+        DUBS_SuperSonic,  //BURN
+        DUBS_MetalRect2,  //ALT METAL
+        DUBS_MetalEvh3,   //SUPER HEAVY
+
+
+        DUBS_Champ57,     //CHAMP
+        DUBS_Twin57,	  //50S TWIN
+        DUBS_Bassman59,   //BASSMAN
+        DUBS_Princeton65, //PRINCETON
+        DUBS_Deluxe65,    //DELUXE CLN
+        DUBS_Twin65,      //TWIN CLEAN
+        DUBS_DR103,       //70S UK CLN
+        DUBS_Ac30Tb,      //60S UK CLN
+        DUBS_Jcm800,      //80S ROCK
+        DUBS_Rect2,       //90S ROCK
+        DUBS_Evh3,        //METAL 2000
+*/
+#endif
+
 static const std::map<std::string, plug::amps> json_amp_names {
             {"DUBS_Deluxe57", plug::amps::FENDER_57_DELUXE},
-            {"Fender '59 Bassman", plug::amps::FENDER_59_BASSMAN },
+            {"DUBS_Bassman59", plug::amps::FENDER_59_BASSMAN },
             {"DUBS_Champ57", plug::amps::FENDER_57_CHAMP},
             {"DUBS_Deluxe65", plug::amps::FENDER_65_DELUXE_REVERB },
             {"DUBS_Princeton65", plug::amps::FENDER_65_PRINCETON, },
@@ -470,12 +524,25 @@ static const std::map<std::string, plug::amps> json_amp_names {
             {"DUBS_SuperSonic", plug::amps::FENDER_SUPER_SONIC},
             {"DUBS_Ac30Tb", plug::amps::BRITISH_60S},
             {"DUBS_DR103", plug::amps::BRITISH_70S},
-            {amps::BRITISH_80S, "British 80's"},
-            {amps::AMERICAN_90S, "American 90's"},
+            {"DUBS_Jcm800", plug::amps::BRITISH_80S},
+            {"DUBS_Rect2", plug::amps::AMERICAN_90S},
             {"DUBS_Evh3",plug::amps::METAL_2000},
-            {amps::STUDIO_PREAMP, "Studio Preamp"},
             {"DUBS_Twin57", plug::amps::FENDER_57_TWIN},
-            {amps::FENDER_60_THRIFT, "Fender '60s Thrift"},
-            {amps::BRITISH_COLOUR, "British Colour"},
-            {amps::BRITISH_WATTS, "British Watts"}};
-#endif
+            // {amps::STUDIO_PREAMP, "Studio Preamp"},
+            // {amps::FENDER_60_THRIFT, "Fender '60s Thrift"},
+            // {amps::BRITISH_COLOUR, "British Colour"},
+            // {amps::BRITISH_WATTS, "British Watts"}};
+};
+
+static const plug::amps* jsonNameToAmpId(std::string jsonName)
+{
+    auto pPair = json_amp_names.find(jsonName);
+    if(pPair!=json_amp_names.cend())
+    {
+        return &(pPair->second);
+    }
+    else
+    {
+        return NULL;
+    }
+}
