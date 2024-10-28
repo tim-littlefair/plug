@@ -241,8 +241,7 @@ static std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vect
             // adjustment is required to account for the 3 bytes
             // at the start of the packet which are not part of
             // the protobuf stream.
-            protobuf_read_offset -= 3;
-            // all future usages of this
+            //protobuf_read_offset -= 3;
         }
         assert(fender_message_type!=-1);
 
