@@ -230,53 +230,22 @@ static std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vect
             // in higher bits
             unsigned int fender_message_tag = protobuf_read_varint(array64_to_vector(p), protobuf_read_offset);
             assert( (fender_message_tag & 0x07) == 2); // protobuf type of whole message is 'LEN'
-            fender_message_type = protobuf_read_offset + (fender_message_tag >> 3);
+            fender_message_type = (fender_message_tag&0xFFFFFFF80) >> 3;
+
+            // the call to protobuf_read_varint 4 lines above passed
+            // an offset relative to the start of the packet and will
+            // have updated protobuf_read_offset to account for the
+            // length of the varint read.
+            // All future uses of protobuf_read_offset require it to
+            // be relative to the start of the protobuf, so an
+            // adjustment is required to account for the 3 bytes
+            // at the start of the packet which are not part of
+            // the protobuf stream.
+            protobuf_read_offset -= 3;
+            // all future usages of this
         }
         assert(fender_message_type!=-1);
 
-#if 0
-        // p[0] is always 0
-        // p[1] is frame type (0x33=first-of-many, 0x34=middle-of-many, 0x35=last-of-one-or-many)
-        // p[2] is length of signficant data in this packet (after p[2])
-        // The rest of the packet is the whole or a fragment of a protobuf message,
-        // which may wrap a JSON jsonDocument
-        switch (p[1])
-        {
-            case 0x33:
-
-                // p[3] appears to hold number of bytes of raw data to be consumed
-                for (int j=0; j<=p[3]; ++j)
-                {
-                    preamble.push_back(p[3+j]);
-                }
-                json_start_offset+= (p[3] + 1);
-                json_length -= ( p[3] + 1 ) ;
-                break;
-
-            case 0x34: // any frame other than first and last
-                json_start_offset = 3;
-                break;
-
-            case 0x35: // last frame of response
-                json_start_offset = 3;
-                //json_length -= 1; // terminating null?
-                // p[3] appears to hold number of bytes of raw data to be consumed
-                for (int j=0; j<=p[3]; ++j)
-                {
-                    preamble.push_back(p[json_start_offset + json_length + j]);
-                }
-                json_start_offset+= (p[3] + 1);
-                json_length -= ( p[3] + 1 ) ;
-
-                break;
-
-
-            default:
-                json_start_offset = 3;
-                json_length=0;
-                continue;
-        }
-#endif
         int pb_start_offset = 3;
         int pb_length = p[2];
 
@@ -293,34 +262,43 @@ static std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vect
     }
     raw_dump_stream.close();
 
-    do
+    switch (fender_message_type)
     {
-        unsigned int next_field_length = protobuf_read_varint(retval[0],protobuf_read_offset);
-        //unsigned int next_field_tag = protobuf_read_varint(retval[0],protobuf_read_offset);
-        unsigned int next_field_type = 2; //next_field_tag & 0x07;
-        switch(next_field_type)
-        {
-            case 2: // length in varint followed by sequence of bytes
-                {
-                    std::vector<uint8_t> next_field_bytes;
-                    std::copy(
-                        retval[0].cbegin() + protobuf_read_offset,
-                        retval[0].cbegin() + protobuf_read_offset + next_field_length,
-                        std::back_inserter(next_field_bytes)
-                    );
-                    protobuf_read_offset += next_field_length;
-                    retval.push_back(next_field_bytes);
-                }
-                next_field_type = 0;
-                break;
+        // Refer to:
+        // https://github.com/brentmaxwell/LtAmp/blob/main/Schema/protobuf/FenderMessageLT.proto
+        // for the constants for different message types
 
-            default:
-                // For the moment we are only interested in the first field.
-                // and only if it is of type LEN
-                protobuf_read_offset = retval[0].size();
-        }
-    } while(protobuf_read_offset<retval[0].size());
+        // Messages in this group start with a JSON document, followed by one or more
+        // fixed format parameters
+        // The JSON document will be returned in retval[1], retval[2] will contain
+        // all other parameters
+        case 32: // currentPresetStatus
+            {
+                unsigned int preset_json_length = protobuf_read_varint(retval[0],protobuf_read_offset);
+                std::vector<uint8_t> preset_json_bytes;
+                std::copy(
+                    retval[0].cbegin() + protobuf_read_offset,
+                    retval[0].cbegin() + protobuf_read_offset + preset_json_length,
+                    std::back_inserter(preset_json_bytes)
+                );
+                retval.push_back(preset_json_bytes);
 
+                protobuf_read_offset += preset_json_length;
+                std::vector<uint8_t> slot_index_bytes;
+                std::copy(
+                    retval[0].cbegin() + protobuf_read_offset,
+                    retval[0].cend(),
+                    std::back_inserter(slot_index_bytes)
+                );
+                retval.push_back(slot_index_bytes);
+            }
+            break;
+
+        default:
+            // For any other message type, for now, we don't need to unpack the protobuf
+            // so we return from here
+            break;
+    }
     return retval;
 }
 
