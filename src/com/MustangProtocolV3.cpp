@@ -231,17 +231,6 @@ static std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vect
             unsigned int fender_message_tag = protobuf_read_varint(array64_to_vector(p), protobuf_read_offset);
             assert( (fender_message_tag & 0x07) == 2); // protobuf type of whole message is 'LEN'
             fender_message_type = (fender_message_tag&0xFFFFFFF80) >> 3;
-
-            // the call to protobuf_read_varint 4 lines above passed
-            // an offset relative to the start of the packet and will
-            // have updated protobuf_read_offset to account for the
-            // length of the varint read.
-            // All future uses of protobuf_read_offset require it to
-            // be relative to the start of the protobuf, so an
-            // adjustment is required to account for the 3 bytes
-            // at the start of the packet which are not part of
-            // the protobuf stream.
-            //protobuf_read_offset -= 3;
         }
         assert(fender_message_type!=-1);
 
