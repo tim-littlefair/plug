@@ -20,9 +20,11 @@
  */
 
 #include "com/MustangProtocolV3.h"
+#include "com/V3FenderIdLookup.h"
+#include "com/V3MessageProtobuf.h"
+#include "com/V3PresetJson.h"
 
 #include "com/Mustang.h"
-#include "com/V3FenderIdLookup.h"
 
 #include <algorithm>
 
@@ -32,28 +34,11 @@
 
 #include <cassert>
 
-#include <qt6/QtCore/QJsonParseError>
-#include <qt6/QtCore/QByteArray>
-#include <qt6/QtCore/QJsonParseError>
-#include <qt6/QtCore/QString>
-#include <qt6/QtCore/QStringLiteral>
-#include <qt6/QtCore/QJsonObject>
-#include <qt6/QtCore/QJsonArray>
-
 // Forward declarations of helper functions
 // definitions of these are at the end of the file, after the namespace closes
 static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outHeaderBytes);
-static std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets, int& fender_message_type);
-static void parse_preset_json(
-    std::vector<uint8_t> response_bytes,
-    const std::string& label,
-    std::string& presetName,
-    plug::amp_settings& presetAmpSettings,
-    std::vector<plug::fx_pedal_settings>& presetEffects
-);
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label);
-static std::vector<uint8_t> array64_to_vector(std::array<uint8_t,64> a);
-static unsigned int protobuf_read_varint(std::vector<uint8_t>p, size_t& protobuf_read_offset);
+
 namespace plug::com
 {
 
@@ -103,7 +88,7 @@ namespace plug::com
             fx_pedal_settings ps{FxSlot{0}, effects::EMPTY, 0, 0, 0, 0, 0, 0, false};
             presetEffects.push_back(ps);
         }
-        parse_preset_json(current_preset_response_bytes[1], "current_preset", currentPresetName, presetAmpSettings, presetEffects);
+        plug::com::v3::parse_preset_json(current_preset_response_bytes[1], "current_preset", currentPresetName, presetAmpSettings, presetEffects);
 
         for(int i=1; i<=60; ++i)
         {
@@ -122,7 +107,7 @@ namespace plug::com
                 storedPresetRequest.c_str(),
                 response_type_received
             );
-            parse_preset_json(stored_preset_response_bytes[1], presetFilename.c_str(), storedPresetName, presetAmpSettings, presetEffects);
+            plug::com::v3::parse_preset_json(stored_preset_response_bytes[1], presetFilename.c_str(), storedPresetName, presetAmpSettings, presetEffects);
 
             debug_dump_hex(current_preset_response_bytes[0],presetFilename.c_str());
             presetNames.push_back(storedPresetName);
@@ -168,7 +153,7 @@ namespace plug::com
         std::cout << "Received response, packet count: " << receivedData.size() << std::endl;
 #endif
 
-        auto response_fields = extractResponsePayload_V3_USB(receivedData, response_message_type);
+        auto response_fields = plug::com::v3::extractResponsePayload_V3_USB(receivedData, response_message_type);
 
 #ifndef NDEBUG
         std::cout << "Response message type is " << response_message_type << std::endl;
@@ -227,183 +212,6 @@ static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array
 
 }
 
-/* This function returns a vector of vectors of bytes
- * element 0 is the whole protobuf std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets)
- * elements 1.. are the top-level fields of the response
- */
-static std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vector<plug::com::PacketRawType> packets, int& fender_message_type)
-{
-    std::vector<std::vector<uint8_t>> retval;
-    retval.push_back(std::vector<uint8_t>());
-
-    // See https://github.com/brentmaxwell/LtAmp/blob/d62fd958cebe231723b160b1d53814754ffe9fbb/Schema/protobuf/FenderMessageLT.proto#L75
-    fender_message_type = -1;
-    size_t protobuf_read_offset = -1;
-
-    for (size_t i=0; i<packets.size(); ++i)
-    {
-        plug::com::PacketRawType p = packets.at(i);
-
-        if(fender_message_type==-1)
-        {
-            // first frame
-            // May or may not be the last frame too
-
-            // Refer to
-            // https://protobuf.dev/programming-guides/encoding/#structure
-            // for information about protobuf types and their encoding
-            assert(p[3]==0x08); // magic number for protobuf
-            assert(p[4]==0x02); // always protobuf v2
-            protobuf_read_offset = 5;
-            // protobuf requires that the next item in the stream is the
-            // 'tag' of the message structure, which is a variable-length-encoded integer
-            // which combines the protobuf type of the message in the three least
-            // significant bits with a magic number assigned for the message
-            // in higher bits
-            unsigned int fender_message_tag = protobuf_read_varint(array64_to_vector(p), protobuf_read_offset);
-            assert( (fender_message_tag & 0x07) == 2); // protobuf type of whole message is 'LEN'
-            fender_message_type = (fender_message_tag&0xFFFFFFF80) >> 3;
-        }
-        assert(fender_message_type!=-1);
-
-        int pb_start_offset = 3;
-        int pb_length = p[2];
-
-        std::copy(
-            p.cbegin() + pb_start_offset,
-            p.cbegin() + pb_start_offset + pb_length,
-            std::back_inserter(retval[0])
-        );
-    }
-    std::ofstream raw_dump_stream("response.raw");
-    for (size_t i = 0; i<retval[0].size(); ++i)
-    {
-        raw_dump_stream << static_cast<char>(retval[0][i]);
-    }
-    raw_dump_stream.close();
-
-    switch (fender_message_type)
-    {
-        // Refer to:
-        // https://github.com/brentmaxwell/LtAmp/blob/main/Schema/protobuf/FenderMessageLT.proto
-        // for the constants for different message types
-
-        // Messages in this group start with a JSON document, followed by one or more
-        // fixed format parameters
-        // The JSON document will be returned in retval[1], retval[2] will contain
-        // all other parameters
-        case 16: // ?
-        case 31: // presetJSONMessage?
-        case 32: // currentPresetStatus
-            {
-                unsigned int preset_json_length = protobuf_read_varint(retval[0],protobuf_read_offset);
-                std::vector<uint8_t> preset_json_bytes;
-                std::copy(
-                    retval[0].cbegin() + protobuf_read_offset,
-                    retval[0].cbegin() + protobuf_read_offset + preset_json_length,
-                    std::back_inserter(preset_json_bytes)
-                );
-                retval.push_back(preset_json_bytes);
-
-                protobuf_read_offset += preset_json_length;
-                std::vector<uint8_t> slot_index_bytes;
-                std::copy(
-                    retval[0].cbegin() + protobuf_read_offset,
-                    retval[0].cend(),
-                    std::back_inserter(slot_index_bytes)
-                );
-                retval.push_back(slot_index_bytes);
-            }
-            break;
-
-        default:
-            // For any other message type, for now, we don't need to unpack the protobuf
-            // so we return from here
-            break;
-    }
-    return retval;
-}
-
-static void parse_preset_json(
-    std::vector<uint8_t> response_bytes,
-    const std::string& label,
-    std::string& presetName,
-    plug::amp_settings& presetAmpSettings,
-    std::vector<plug::fx_pedal_settings>& presetEffects
-){
-    std::string json_dump_fname = label;
-    json_dump_fname.append(".json");
-    std::ofstream json_dump_stream(json_dump_fname);
-
-    response_bytes.push_back(static_cast<uint8_t>(0));
-    const char* jsonNullTerminatedCharString = reinterpret_cast<const char*>(&(response_bytes.at(0)));
-
-
-    QByteArray jsonQByteArray(jsonNullTerminatedCharString,response_bytes.size()-1);
-    QJsonParseError parseError;
-    QJsonDocument jsonDocument = QJsonDocument::fromJson(jsonQByteArray, &parseError);
-    if(parseError.error==14)
-    {
-        // valid JSON followed by extra stuff - reparse to the end of the valid JSON
-        QByteArray jsonQByteArray2(jsonNullTerminatedCharString,parseError.offset);
-        jsonDocument = QJsonDocument::fromJson(jsonQByteArray2, &parseError);
-    }
-
-    if(jsonDocument.isNull())
-    {
-        json_dump_stream << "JSON parse error of type " << parseError.error
-                            << " at offset " << parseError.offset  << std::endl << std::endl;
-        return;
-    }
-
-#ifndef NDEBUG
-        // dump a human-readable indented rendering of the single-line JSON retrieved from packets
-    json_dump_stream << jsonDocument.toJson(QJsonDocument::Indented).data() << std::endl;
-    json_dump_stream.flush();
-    json_dump_stream.close();
-#endif
-
-    QString qName = jsonDocument.object().value(QStringLiteral("info")).toObject().value(QStringLiteral("displayName")).toString();
-
-    presetName = qPrintable(qName);
-    QJsonArray audioGraphNodes = jsonDocument.object().value(QStringLiteral("audioGraph")).toObject().value(QStringLiteral("nodes")).toArray();
-    for(qsizetype i=0; i<audioGraphNodes.count(); ++i)
-    {
-        auto node = audioGraphNodes[i].toObject();
-        auto whichNode = node.value(QStringLiteral("nodeId")).toString();
-        auto nodeFenderId = node.value(QStringLiteral("FenderId")).toString();
-        if (whichNode==QStringLiteral("amp"))
-        {
-            auto ampId = plug::com::v3::jsonNameToAmpId(std::string(qPrintable(nodeFenderId)));
-#ifndef NDEBUG
-            std::cout << "Getting settings for amp with FenderId " << qPrintable(nodeFenderId) << " type " << (0 + value(ampId)) << std::endl;
-#endif
-            presetAmpSettings.amp_num = ampId;
-            presetAmpSettings.bass = node.value(QStringLiteral("bass")).toDouble();
-            presetAmpSettings.bias = node.value(QStringLiteral("bias")).toInt();
-    /*
-            //presentAmpSettings.brightness = node.value(QStringLiteral("brightness")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-    */
-
-        }
-        else
-        {
-#ifndef NDEBUG
-            std::cout << "Ignoring node of type " << qPrintable(whichNode) << " with FenderId " << qPrintable(nodeFenderId) << std::endl;
-#endif
-        }
-    }
-    assert(presetEffects.size()>=1);
-}
 
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label)
 {
@@ -455,32 +263,5 @@ static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label
 #endif
 }
 
-static std::vector<uint8_t> array64_to_vector(std::array<uint8_t,64> a)
-{
-    std::vector<uint8_t> v;
-    std::copy(a.cbegin(),a.cend(),std::back_inserter(v));
-    return v;
-}
 
-static unsigned int protobuf_read_varint(std::vector<uint8_t> p, size_t& protobuf_read_offset)
-{
-    unsigned int retval=0;
-    unsigned int multiplier = 1;
-    do
-    {
-        uint8_t next_byte = p[protobuf_read_offset];
-        ++protobuf_read_offset;
-        if( (next_byte&0x80) == 0 )
-        {
-            retval += next_byte * multiplier;
-            break;
-        }
-        else
-        {
-            retval += (next_byte&0x7F) * multiplier;
-            multiplier *= 128;
-        }
-    } while(true);
-    return retval;
-}
 
