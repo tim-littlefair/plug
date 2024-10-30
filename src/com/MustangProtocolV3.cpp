@@ -97,25 +97,39 @@ namespace plug::com
         int response_type_received;
         std::vector<std::vector<uint8_t>> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801", response_type_received);
         debug_dump_hex(current_preset_response_bytes[0],"current_preset");
-
-        for(int i=1; i<=60; ++i)
-        {
-            std::ostringstream presetFilenameStr;
-            presetFilenameStr << "preset_" << std::setfill('0') << std::setw(2) << i << std::ends;
-            //std::vector<std::vector<uint8_t>> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801", response_type_received);
-            //debug_dump_hex(current_preset_response_bytes[0],"current_preset");
-            presetNames.push_back(presetFilenameStr.str());
-        }
-
         for(int i=1; i<=8; ++i)
         {
             fx_pedal_settings ps{FxSlot{0}, effects::EMPTY, 0, 0, 0, 0, 0, 0, false};
             presetEffects.push_back(ps);
         }
-
         parse_preset_json(current_preset_response_bytes[1], "current_preset", currentPresetName, presetAmpSettings, presetEffects);
 
+        for(int i=1; i<=60; ++i)
+        {
+            std::string storedPresetName;
+
+            std::ostringstream presetFilenameStr;
+            presetFilenameStr << "preset_" << std::setfill('0') << std::setw(2) << i << std::ends;
+            std::string presetFilename = presetFilenameStr.str();
+
+            std::ostringstream storedPresetRequestStr;
+            storedPresetRequestStr << "35070800ca060208" << std::setfill('0') << std::setw(2) << std::hex << i << "0110" << std::ends;
+            std::string storedPresetRequest = storedPresetRequestStr.str();
+
+            std::vector<std::vector<uint8_t>> stored_preset_response_bytes = sendCommandAndReceiveResponse(
+                presetFilename.c_str(),
+                storedPresetRequest.c_str(),
+                response_type_received
+            );
+            parse_preset_json(stored_preset_response_bytes[1], presetFilename.c_str(), storedPresetName, presetAmpSettings, presetEffects);
+
+            debug_dump_hex(current_preset_response_bytes[0],presetFilename.c_str());
+            presetNames.push_back(storedPresetName);
+        }
+
+
         m_ppConn = NULL;
+
         return InitialData{SignalChain{currentPresetName, presetAmpSettings, presetEffects},presetNames};
     }
 
@@ -125,6 +139,9 @@ namespace plug::com
         int& response_message_type
     )
     {
+#ifndef NDEBUG
+        std::cout << "Sending " << command_description << ":" << command_hex_bytes << std::endl;
+#endif
         Header header;
         std::array<uint8_t, 16> headerBytes;
         hexStringToArrayOf16Bytes(command_hex_bytes, headerBytes);
@@ -146,7 +163,15 @@ namespace plug::com
 
         const auto receivedData = receiveResponse((*m_ppConn), true);
 
+#ifndef NDEBUG
+        std::cout << "Received response, packet count: " << receivedData.size() << std::endl;
+#endif
+
         auto response_fields = extractResponsePayload_V3_USB(receivedData, response_message_type);
+
+#ifndef NDEBUG
+        std::cout << "Response message type is " << response_message_type << std::endl;
+#endif
 
         return response_fields;
     }
@@ -266,6 +291,8 @@ static std::vector<std::vector<uint8_t>> extractResponsePayload_V3_USB(std::vect
         // fixed format parameters
         // The JSON document will be returned in retval[1], retval[2] will contain
         // all other parameters
+        case 16: // ?
+        case 31: // presetJSONMessage?
         case 32: // currentPresetStatus
             {
                 unsigned int preset_json_length = protobuf_read_varint(retval[0],protobuf_read_offset);
@@ -342,24 +369,27 @@ static void parse_preset_json(
     for(qsizetype i=0; i<audioGraphNodes.count(); ++i)
     {
         auto node = audioGraphNodes[i].toObject();
-        QString nodeFenderId = qPrintable(node.value(QStringLiteral("nodeFenderId")).toString());
-        auto ampId = jsonNameToAmpId(std::string(qPrintable(nodeFenderId)));
-        presetAmpSettings.amp_num = ampId;
-        presetAmpSettings.bass = node.value(QStringLiteral("bass")).toDouble();
-        presetAmpSettings.bias = node.value(QStringLiteral("bias")).toInt();
-/*
-        //presentAmpSettings.brightness = node.value(QStringLiteral("brightness")).toDouble();
-        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+        if (node.value(QStringLiteral("nodeType")).toString()==QStringLiteral("amp"))
+        {
+            QString nodeFenderId = qPrintable(node.value(QStringLiteral("FenderId")).toString());
+            auto ampId = jsonNameToAmpId(std::string(qPrintable(nodeFenderId)));
+            presetAmpSettings.amp_num = ampId;
+            presetAmpSettings.bass = node.value(QStringLiteral("bass")).toDouble();
+            presetAmpSettings.bias = node.value(QStringLiteral("bias")).toInt();
+    /*
+            //presentAmpSettings.brightness = node.value(QStringLiteral("brightness")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
 
-        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-*/
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+    */
 
+        }
     }
     assert(presetEffects.size()>=1);
 }
