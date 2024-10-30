@@ -135,13 +135,13 @@ namespace plug::com::v3
                     retval.push_back(preset_json_bytes);
 
                     protobuf_read_offset += preset_json_length;
-                    std::vector<uint8_t> slot_index_bytes;
+                    std::vector<uint8_t> rest_of_message_bytes;
                     std::copy(
                         retval[0].cbegin() + protobuf_read_offset,
                         retval[0].cend(),
-                        std::back_inserter(slot_index_bytes)
+                        std::back_inserter(rest_of_message_bytes)
                     );
-                    retval.push_back(slot_index_bytes);
+                    retval.push_back(rest_of_message_bytes);
                 }
                 break;
 

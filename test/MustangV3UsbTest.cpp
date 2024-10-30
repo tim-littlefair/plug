@@ -43,7 +43,7 @@ namespace plug::test
         void SetUp() override
         {
             conn = std::make_shared<mock::MockConnection>();
-            m = std::make_unique<com::Mustang>(DeviceModel{"V3 Test Device", DeviceModel::Category::MustangV3_USB, 100}, conn);
+            m = std::make_unique<com::Mustang>(DeviceModel{"V3 Test Device", DeviceModel::Category::MustangV3_USB, 60}, conn);
             p = MustangProtocolBase::factory(m->getDeviceModel());
             //loadCmd = p->serializeLoadCommand().getBytes();
         }
@@ -139,7 +139,19 @@ namespace plug::test
         // Load cmd
         EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
 
-        // V3 does not return preset names in the load response
+        // V3 returns a large protobuf-wrapped JSON document containing the current preset
+        const std::vector<std::vector<std::uint8_t>> v3currentPreset;
+        std::ifstream emptyPresetJson("../../test/data/empty_preset.json");
+        std::vector<std::uint8_t> firstPacket{
+            0x00, 0x33, 0x3d, // type=unsolicited, pos=first_of_many, remaining_signficant_bytes=61(==packetsize(64)-these(3))
+            0x08, 0x02, // magic=protobuf, protobuf_version=2
+            0xfa, 0x01, // message tag as varint: vi_value=(0xfa&0x7f)+(0x01<<7)=0x7a+0x80=0xfa pbtype=(0xfa&0x07)=0x2 msgid=(0xfa&0xf8)>>3=32
+            0x98, 0x0f, // because pbtype=2 message length as varint: vi_value=(0x98&0x7f)+(0x0f<<7)=0x18+0x780=0x798 = 1944 decimal
+            0x0a, // element tag for first field, pbtype=0x02, fieldid=0x01
+            0x93, 0x0f, // because pbtype=2, field length as varint: vi_value=(0x93&0x7f)+(0x0f<<7)=0x13+0x780=0x793 = 1939 decimal
+            // packet continues 0x7b, 0x22, 0x63, 0x6f ... but we will get these from empty_preset.json
+        };
+        // { std::vector<std::uint8_t> d(packetRawTypeSize, 0x00); d[16] = 0x5e; return d; }();
         // EXPECT_CALL(*conn, receive(packetRawTypeSize)).Times(numPresetPackets).WillRepeatedly(Return(ignoreData));
 
         // TODO: Infrastructure required for preparing a sequence of packets wrapping JSON data conforming to V3 behaviour
