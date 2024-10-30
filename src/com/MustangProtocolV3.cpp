@@ -53,7 +53,7 @@ static void parse_preset_json(
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label);
 static std::vector<uint8_t> array64_to_vector(std::array<uint8_t,64> a);
 static unsigned int protobuf_read_varint(std::vector<uint8_t>p, size_t& protobuf_read_offset);
-static const plug::amps* jsonNameToAmpId(std::string jsonName);
+plug::amps jsonNameToAmpId(std::string jsonName);
 
 namespace plug::com
 {
@@ -337,28 +337,24 @@ static void parse_preset_json(
     {
         auto node = audioGraphNodes[i].toObject();
         QString nodeFenderId = qPrintable(node.value(QStringLiteral("nodeFenderId")).toString());
-        auto pAmpId = jsonNameToAmpId(std::string(qPrintable(nodeFenderId)));
-        if(pAmpId != NULL)
-        {
-            presetAmpSettings.amp_num = *pAmpId;
-            presetAmpSettings.bass = node.value(QStringLiteral("bass")).toDouble();
-            presetAmpSettings.bias = node.value(QStringLiteral("bias")).toInt();
+        auto ampId = jsonNameToAmpId(std::string(qPrintable(nodeFenderId)));
+        presetAmpSettings.amp_num = ampId;
+        presetAmpSettings.bass = node.value(QStringLiteral("bass")).toDouble();
+        presetAmpSettings.bias = node.value(QStringLiteral("bias")).toInt();
 /*
-            //presentAmpSettings.brightness = node.value(QStringLiteral("brightness")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+        //presentAmpSettings.brightness = node.value(QStringLiteral("brightness")).toDouble();
+        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
 
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-            presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+        presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
 */
-        }
 
     }
-    presetAmpSettings.amp_num = plug::amps::STUDIO_PREAMP;
     assert(presetEffects.size()>=1);
 }
 
@@ -500,15 +496,15 @@ static const std::map<std::string, plug::amps> json_amp_names {
             // {amps::BRITISH_WATTS, "British Watts"}};
 };
 
-static const plug::amps* jsonNameToAmpId(std::string jsonName)
+plug::amps jsonNameToAmpId(std::string jsonName)
 {
     auto pPair = json_amp_names.find(jsonName);
     if(pPair!=json_amp_names.cend())
     {
-        return &(pPair->second);
+        return pPair->second;
     }
     else
     {
-        return NULL;
+        return plug::amps::MUSTANG_V3_NOT_RECOGNIZED;
     }
 }

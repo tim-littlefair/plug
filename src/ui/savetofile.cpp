@@ -104,6 +104,9 @@ namespace plug
 
         switch (static_cast<amps>(settings.amp_num))
         {
+            case amps::MUSTANG_V3_NOT_RECOGNIZED:
+                // Until we have an understanding of this,
+                // we treat it as if it were FENDER_57_DELUXE
             case amps::FENDER_57_DELUXE:
                 model = 0x67;
                 something = 0x01;

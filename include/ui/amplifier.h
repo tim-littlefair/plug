@@ -53,6 +53,9 @@ namespace plug
 
         void setDeviceModel(DeviceModel model);
 
+        void setV3FenderNodeId(std::string v3FenderNodeId);
+        std::string getV3FenderNodeId();
+
     private:
         const std::unique_ptr<Ui::Amplifier> ui;
         std::unique_ptr<Amp_Advanced> advanced;
@@ -61,6 +64,7 @@ namespace plug
         cabinets cabinet;
         unsigned char noise_gate, presence, gain2, master_vol, threshold, depth, bias, sag, usb_gain;
         bool changed, brightness;
+        std::string v3FenderNodeId;
 
     public slots:
         // set basic variables

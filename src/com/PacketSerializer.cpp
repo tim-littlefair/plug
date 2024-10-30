@@ -233,6 +233,9 @@ namespace plug::com
 
         switch (value.amp_num)
         {
+            case amps::MUSTANG_V3_NOT_RECOGNIZED:
+                // Until we have an understanding of this,
+                // we treat it as if it were FENDER_57_DELUXE
             case amps::FENDER_57_DELUXE:
                 payload.setModel(0x67);
                 payload.setUnknownAmpSpecific(0x01, 0x01, 0x01, 0x01, 0x53);

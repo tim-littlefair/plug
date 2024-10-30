@@ -59,7 +59,12 @@ namespace plug
         }
         else
         {
-            return "Unknown amp";
+            /*
+            std::string unknownAmpName("Unknown amp (V3FenderNodeId='");
+            unknownAmpName.append(v3FenderNodeId);
+            unknownAmpName.append("')");
+            */
+            return "Unknown ampilifier - new in V3?";
         }
     }
 
@@ -119,6 +124,16 @@ namespace plug
                       {
                 if (!isV2Amp(item.first) || (isV2Amp(item.first) && model.category() == DeviceModel::Category::MustangV2)){
                 ui->comboBox->addItem(QString::fromStdString(item.second));} });
+    }
+
+    void Amplifier::setV3FenderNodeId(std::string v3FenderNodeId_)
+    {
+        this->v3FenderNodeId = v3FenderNodeId_;
+    }
+
+    std::string Amplifier::getV3FenderNodeId()
+    {
+        return v3FenderNodeId;
     }
 
     void Amplifier::set_gain(int value)
