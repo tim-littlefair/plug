@@ -22,6 +22,7 @@
 #include "com/MustangProtocolV3.h"
 
 #include "com/Mustang.h"
+#include "com/V3FenderIdLookup.h"
 
 #include <algorithm>
 
@@ -53,8 +54,6 @@ static void parse_preset_json(
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label);
 static std::vector<uint8_t> array64_to_vector(std::array<uint8_t,64> a);
 static unsigned int protobuf_read_varint(std::vector<uint8_t>p, size_t& protobuf_read_offset);
-plug::amps jsonNameToAmpId(std::string jsonName);
-
 namespace plug::com
 {
 
@@ -91,6 +90,8 @@ namespace plug::com
         amp_settings presetAmpSettings;
         std::vector<std::string> presetNames;
         std::vector<plug::fx_pedal_settings> presetEffects;
+
+        v3::populate_reverse_maps();
 
         m_ppConn = &conn;
 
@@ -373,9 +374,9 @@ static void parse_preset_json(
         auto nodeFenderId = node.value(QStringLiteral("FenderId")).toString();
         if (whichNode==QStringLiteral("amp"))
         {
-            auto ampId = jsonNameToAmpId(std::string(qPrintable(nodeFenderId)));
+            auto ampId = plug::com::v3::jsonNameToAmpId(std::string(qPrintable(nodeFenderId)));
 #ifndef NDEBUG
-            std::cout << "Getting settings for amp with FenderId " << qPrintable(nodeFenderId) << " type " << value(ampId) << std::endl;
+            std::cout << "Getting settings for amp with FenderId " << qPrintable(nodeFenderId) << " type " << (0 + value(ampId)) << std::endl;
 #endif
             presetAmpSettings.amp_num = ampId;
             presetAmpSettings.bass = node.value(QStringLiteral("bass")).toDouble();
@@ -397,7 +398,7 @@ static void parse_preset_json(
         else
         {
 #ifndef NDEBUG
-            // std::cout << "Ignoring node of type " << qPrintable(whichNode) << " with FenderId " << qPrintable(nodeFenderId) << std::endl;
+            std::cout << "Ignoring node of type " << qPrintable(whichNode) << " with FenderId " << qPrintable(nodeFenderId) << std::endl;
 #endif
         }
     }
@@ -483,90 +484,3 @@ static unsigned int protobuf_read_varint(std::vector<uint8_t> p, size_t& protobu
     return retval;
 }
 
-#if 0
-"FenderId": ,
-"FenderId": ,
-"FenderId": "",
-"FenderId": "DUBS_Excelsior",
-"FenderId": "DUBS_LinearGain",
-"FenderId": "DUBS_Or120",
-"FenderId": "",
-"FenderId": "DUBS_Silvertone",
-"FenderId": ,
-"FenderId": ,
-
-// Names here are copied from brentmaxwell's C# work at
-// https://github.com/brentmaxwell/LtAmp/blob/d62fd958cebe231723b160b1d53814754ffe9fbb/LtAmpDotNet/LtAmpDotNet.Lib/Model/Preset/Node.cs#L74
-/*
-        DBUS_LinearGain,  //SUPER CLEAN
-        DUBS_Excelsior,   //EXCELSIOR
-        DUBS_Silvertone,  //SMALLTONE
-        DUBS_Or120,       //DOOM METAL
-        DUBS_Plexi87,     //70S ROCK
-        DUBS_SuperSonic,  //BURN
-        DUBS_MetalRect2,  //ALT METAL
-        DUBS_MetalEvh3,   //SUPER HEAVY
-
-
-        DUBS_Champ57,     //CHAMP
-        DUBS_Twin57,	  //50S TWIN
-        DUBS_Bassman59,   //BASSMAN
-        DUBS_Princeton65, //PRINCETON
-        DUBS_Deluxe65,    //DELUXE CLN
-        DUBS_Twin65,      //TWIN CLEAN
-        DUBS_DR103,       //70S UK CLN
-        DUBS_Ac30Tb,      //60S UK CLN
-        DUBS_Jcm800,      //80S ROCK
-        DUBS_Rect2,       //90S ROCK
-        DUBS_Evh3,        //METAL 2000
-*/
-#endif
-
-static const std::map<std::string, plug::amps> json_amp_names {
-            {"DUBS_Deluxe57", plug::amps::FENDER_57_DELUXE},
-            {"DUBS_Bassman59", plug::amps::FENDER_59_BASSMAN },
-            {"DUBS_Champ57", plug::amps::FENDER_57_CHAMP},
-            {"DUBS_Deluxe65", plug::amps::FENDER_65_DELUXE_REVERB },
-            {"DUBS_Princeton65", plug::amps::FENDER_65_PRINCETON, },
-            {"DUBS_Twin65", plug::amps::FENDER_65_TWIN_REVERB},
-            {"DUBS_SuperSonic", plug::amps::FENDER_SUPER_SONIC},
-            {"DUBS_Ac30Tb", plug::amps::BRITISH_60S},
-            {"DUBS_Jcm800", plug::amps::BRITISH_80S},
-            {"DUBS_Rect2", plug::amps::AMERICAN_90S},
-            {"DUBS_MetalEvh3",plug::amps::METAL_2000},
-            {"DUBS_Twin57", plug::amps::FENDER_57_TWIN},
-
-            // Assignments below this point are presently guesses
-            // but using on information from
-            // https://www.tdpri.com/threads/fender-mustang-gt-series-amps.723363/page-15
-            // https://www.tdpri.com/threads/fender-fuse-software-discontinued.1015858/page-4
-            // https://fender-mustang-amps-and-fuse.fandom.com/wiki/Amp_Models
-            {"DUBS_LinearGain", plug::amps::STUDIO_PREAMP},
-            {"DUBS_Plexi87", plug::amps::BRITISH_70S},
-            {"DUBS_DR103", plug::amps::BRITISH_WATTS},
-            {"DUBS_Silvertone", plug::amps::FENDER_60_THRIFT},
-
-            {"DUBS_Or120", plug::amps::BRITISH_COLOUR},
-
-            {"DUBS_Excelsior", plug::amps::V3_EXCELSIOR},
-            {"DUBS_MetalRect2", plug::amps::V3_METAL_RECT_2},
-};
-
-plug::amps jsonNameToAmpId(std::string jsonName)
-{
-    auto pPair = json_amp_names.find(jsonName);
-    if(pPair!=json_amp_names.cend())
-    {
-#ifndef _NDEBUG
-    std::cout << "jsonNameToAmpId: " << jsonName << " -> " << (0 + value(pPair->second)) << std::endl;
-#endif
-        return pPair->second;
-    }
-    else
-    {
-#ifndef _NDEBUG
-    std::cout << "jsonNameToAmpId: " << jsonName << " not recognized " << std::endl;
-#endif
-        return plug::amps::V3_NOT_RECOGNIZED;
-    }
-}
