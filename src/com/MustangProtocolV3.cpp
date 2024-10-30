@@ -87,21 +87,26 @@ namespace plug::com
 
     InitialData MustangProtocolV3::loadPresetData(const std::shared_ptr<Connection> conn)
     {
+        std::string currentPresetName;
+        amp_settings presetAmpSettings;
+        std::vector<std::string> presetNames;
+        std::vector<plug::fx_pedal_settings> presetEffects;
+
         m_ppConn = &conn;
+
         int response_type_received;
         std::vector<std::vector<uint8_t>> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801", response_type_received);
         debug_dump_hex(current_preset_response_bytes[0],"current_preset");
-        m_ppConn = NULL;
-        std::string currentPresetName;
 
-        std::vector<std::string> presetNames;
-        amp_settings presetAmpSettings;
-        presetAmpSettings.amp_num = plug::amps::STUDIO_PREAMP;
-        std::vector<plug::fx_pedal_settings> presetEffects;
         for(int i=1; i<=60; ++i)
         {
-            presetNames.push_back("x");
+            std::ostringstream presetFilenameStr;
+            presetFilenameStr << "preset_" << std::setfill('0') << std::setw(2) << i << std::ends;
+            //std::vector<std::vector<uint8_t>> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801", response_type_received);
+            //debug_dump_hex(current_preset_response_bytes[0],"current_preset");
+            presetNames.push_back(presetFilenameStr.str());
         }
+
         for(int i=1; i<=8; ++i)
         {
             fx_pedal_settings ps{FxSlot{0}, effects::EMPTY, 0, 0, 0, 0, 0, 0, false};
@@ -110,6 +115,7 @@ namespace plug::com
 
         parse_preset_json(current_preset_response_bytes[1], "current_preset", currentPresetName, presetAmpSettings, presetEffects);
 
+        m_ppConn = NULL;
         return InitialData{SignalChain{currentPresetName, presetAmpSettings, presetEffects},presetNames};
     }
 
