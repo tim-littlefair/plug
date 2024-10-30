@@ -369,10 +369,14 @@ static void parse_preset_json(
     for(qsizetype i=0; i<audioGraphNodes.count(); ++i)
     {
         auto node = audioGraphNodes[i].toObject();
-        if (node.value(QStringLiteral("nodeType")).toString()==QStringLiteral("amp"))
+        auto whichNode = node.value(QStringLiteral("nodeId")).toString();
+        auto nodeFenderId = node.value(QStringLiteral("FenderId")).toString();
+        if (whichNode==QStringLiteral("amp"))
         {
-            QString nodeFenderId = qPrintable(node.value(QStringLiteral("FenderId")).toString());
             auto ampId = jsonNameToAmpId(std::string(qPrintable(nodeFenderId)));
+#ifndef NDEBUG
+            std::cout << "Getting settings for amp with FenderId " << qPrintable(nodeFenderId) << " type " << value(ampId) << std::endl;
+#endif
             presetAmpSettings.amp_num = ampId;
             presetAmpSettings.bass = node.value(QStringLiteral("bass")).toDouble();
             presetAmpSettings.bias = node.value(QStringLiteral("bias")).toInt();
@@ -389,6 +393,12 @@ static void parse_preset_json(
             presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
     */
 
+        }
+        else
+        {
+#ifndef NDEBUG
+            // std::cout << "Ignoring node of type " << qPrintable(whichNode) << " with FenderId " << qPrintable(nodeFenderId) << std::endl;
+#endif
         }
     }
     assert(presetEffects.size()>=1);
@@ -521,15 +531,25 @@ static const std::map<std::string, plug::amps> json_amp_names {
             {"DUBS_Twin65", plug::amps::FENDER_65_TWIN_REVERB},
             {"DUBS_SuperSonic", plug::amps::FENDER_SUPER_SONIC},
             {"DUBS_Ac30Tb", plug::amps::BRITISH_60S},
-            {"DUBS_DR103", plug::amps::BRITISH_70S},
             {"DUBS_Jcm800", plug::amps::BRITISH_80S},
             {"DUBS_Rect2", plug::amps::AMERICAN_90S},
-            {"DUBS_Evh3",plug::amps::METAL_2000},
+            {"DUBS_MetalEvh3",plug::amps::METAL_2000},
             {"DUBS_Twin57", plug::amps::FENDER_57_TWIN},
-            // {amps::STUDIO_PREAMP, "Studio Preamp"},
-            // {amps::FENDER_60_THRIFT, "Fender '60s Thrift"},
-            // {amps::BRITISH_COLOUR, "British Colour"},
-            // {amps::BRITISH_WATTS, "British Watts"}};
+
+            // Assignments below this point are presently guesses
+            // but using on information from
+            // https://www.tdpri.com/threads/fender-mustang-gt-series-amps.723363/page-15
+            // https://www.tdpri.com/threads/fender-fuse-software-discontinued.1015858/page-4
+            // https://fender-mustang-amps-and-fuse.fandom.com/wiki/Amp_Models
+            {"DUBS_LinearGain", plug::amps::STUDIO_PREAMP},
+            {"DUBS_Plexi87", plug::amps::BRITISH_70S},
+            {"DUBS_DR103", plug::amps::BRITISH_WATTS},
+            {"DUBS_Silvertone", plug::amps::FENDER_60_THRIFT},
+
+            {"DUBS_Or120", plug::amps::BRITISH_COLOUR},
+
+            {"DUBS_Excelsior", plug::amps::V3_EXCELSIOR},
+            {"DUBS_MetalRect2", plug::amps::V3_METAL_RECT_2},
 };
 
 plug::amps jsonNameToAmpId(std::string jsonName)
@@ -537,10 +557,16 @@ plug::amps jsonNameToAmpId(std::string jsonName)
     auto pPair = json_amp_names.find(jsonName);
     if(pPair!=json_amp_names.cend())
     {
+#ifndef _NDEBUG
+    std::cout << "jsonNameToAmpId: " << jsonName << " -> " << (0 + value(pPair->second)) << std::endl;
+#endif
         return pPair->second;
     }
     else
     {
-        return plug::amps::MUSTANG_V3_NOT_RECOGNIZED;
+#ifndef _NDEBUG
+    std::cout << "jsonNameToAmpId: " << jsonName << " not recognized " << std::endl;
+#endif
+        return plug::amps::V3_NOT_RECOGNIZED;
     }
 }

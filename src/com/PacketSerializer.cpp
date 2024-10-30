@@ -20,6 +20,7 @@
  */
 
 #include "com/PacketSerializer.h"
+#include "com/V3SupportException.h"
 #include "com/IdLookup.h"
 #include "effects_enum.h"
 #include <algorithm>
@@ -233,9 +234,6 @@ namespace plug::com
 
         switch (value.amp_num)
         {
-            case amps::MUSTANG_V3_NOT_RECOGNIZED:
-                // Until we have an understanding of this,
-                // we treat it as if it were FENDER_57_DELUXE
             case amps::FENDER_57_DELUXE:
                 payload.setModel(0x67);
                 payload.setUnknownAmpSpecific(0x01, 0x01, 0x01, 0x01, 0x53);
@@ -321,6 +319,12 @@ namespace plug::com
                 payload.setModel(0xff);
                 payload.setUnknownAmpSpecific(0x11, 0x11, 0x11, 0x11, 0x00);
                 break;
+
+            case amps::V3_EXCELSIOR:
+            case amps::V3_METAL_RECT_2:
+            case amps::V3_NOT_RECOGNIZED:
+                throw V3SupportException("Attempt to serialize V3 amplifier");
+
         }
 
         return Packet<AmpPayload>{header, payload};

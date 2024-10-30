@@ -22,6 +22,8 @@
 #include "ui/savetofile.h"
 #include "ui/mainwindow.h"
 #include "ui_savetofile.h"
+
+#include "com/V3SupportException.h"
 #include <QFileDialog>
 #include <QMessageBox>
 
@@ -104,9 +106,6 @@ namespace plug
 
         switch (static_cast<amps>(settings.amp_num))
         {
-            case amps::MUSTANG_V3_NOT_RECOGNIZED:
-                // Until we have an understanding of this,
-                // we treat it as if it were FENDER_57_DELUXE
             case amps::FENDER_57_DELUXE:
                 model = 0x67;
                 something = 0x01;
@@ -209,6 +208,11 @@ namespace plug
                 something = 0x11;
                 something2 = 0x00;
                 break;
+
+            case amps::V3_EXCELSIOR:
+            case amps::V3_METAL_RECT_2:
+            case amps::V3_NOT_RECOGNIZED:
+                throw plug::com::V3SupportException("Attempt to save unsupported V3 amp to file");
         }
 
         xml->writeStartElement("Amplifier");

@@ -50,7 +50,9 @@ namespace plug
         BRITISH_WATTS,
 
         // Mustang v3
-        MUSTANG_V3_NOT_RECOGNIZED
+        V3_EXCELSIOR,
+        V3_METAL_RECT_2,
+        V3_NOT_RECOGNIZED
     };
 
     constexpr bool isV2Amp(amps amp)
@@ -65,10 +67,12 @@ namespace plug
 
             // I don't want to rename this function,
             // but the semantics are clearly not so
-            // much 'isV3Amp' as 'isntV1Amp' so this
+            // much 'isV2Amp' as 'isntV1Amp' so these
             // entry (and any other new V3 ones we
             // discover) will belong here
-            case amps::MUSTANG_V3_NOT_RECOGNIZED:
+            case amps::V3_EXCELSIOR:
+            case amps::V3_METAL_RECT_2:
+            case amps::V3_NOT_RECOGNIZED:
 
                 return true;
             default:

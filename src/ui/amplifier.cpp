@@ -47,7 +47,11 @@ namespace plug
             {amps::FENDER_57_TWIN, "Fender '57 Twin"},
             {amps::FENDER_60_THRIFT, "Fender '60s Thrift"},
             {amps::BRITISH_COLOUR, "British Colour"},
-            {amps::BRITISH_WATTS, "British Watts"}};
+            {amps::BRITISH_WATTS, "British Watts"},
+            {amps::V3_EXCELSIOR, "Fender Excelsior (v3)"},
+            {amps::V3_EXCELSIOR, "Metal Rect 2 (v3)"},
+            {amps::V3_EXCELSIOR, "Unknown (v3)"},
+        };
     }
 
     static std::string ampNameLookup(amps ampId)
