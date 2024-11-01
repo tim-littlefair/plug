@@ -79,6 +79,33 @@ namespace plug::test
         static inline constexpr std::size_t numPresetPackets{200};
         static inline constexpr int slot{5};
 
+        void doRequestForActivePreset()
+        {
+            PacketRawType loadCmd = p->serializeCommand("35070800c206020801").getBytes();
+            EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
+            std::vector<std::vector<uint8_t>> currentPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"));
+            ASSERT_EQ(currentPresetPackets.size(),30);
+            for(size_t i=0; i<currentPresetPackets.size(); ++i)
+            {
+                EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(currentPresetPackets[i]));
+            }
+        }
+
+        void doRequestsForAllStoredPresets()
+        {
+            for (size_t i=1; i<=m->getDeviceModel().numberOfPresets();++i)
+            {
+                PacketRawType presetCmd = p->serializePresetRequestCommand(i).getBytes();
+                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"));
+                EXPECT_CALL(*conn, sendImpl(BufferIs(presetCmd), presetCmd.size())).WillOnce(Return(presetCmd.size()));
+                ASSERT_EQ(storedPresetPackets.size(),30);
+                for(size_t j=0; j<storedPresetPackets.size(); ++j)
+                {
+                    EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(storedPresetPackets[j]));
+                }
+            }
+        }
+
     };
 #if 0
     TEST_F(MustangV3UsbTest, startInitializesDevice)
@@ -139,27 +166,9 @@ namespace plug::test
         EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-        // Load cmd
-        PacketRawType loadCmd = p->serializeCommand("35070800c206020801").getBytes();
-        EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
-        std::vector<std::vector<uint8_t>> currentPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"));
-        ASSERT_EQ(currentPresetPackets.size(),30);
-        for(size_t i=0; i<currentPresetPackets.size(); ++i)
-        {
-            EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(currentPresetPackets[i]));
-        }
+        doRequestForActivePreset();
+        doRequestsForAllStoredPresets();
 
-        for (size_t i=1; i<=m->getDeviceModel().numberOfPresets();++i)
-        {
-            PacketRawType presetCmd = p->serializePresetRequestCommand(i).getBytes();
-            std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"));
-            EXPECT_CALL(*conn, sendImpl(BufferIs(presetCmd), presetCmd.size())).WillOnce(Return(presetCmd.size()));
-            ASSERT_EQ(storedPresetPackets.size(),30);
-            for(size_t j=0; j<storedPresetPackets.size(); ++j)
-            {
-                EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(storedPresetPackets[j]));
-            }
-        }
 
         const auto [signalChain, presets] = m->start_amp();
         const std::string actualName{"EMPTY"};
