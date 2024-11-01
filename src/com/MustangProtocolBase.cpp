@@ -38,6 +38,8 @@
 #include <vector>
 #include <cctype>
 
+#include <cassert>
+
 namespace plug::com
 {
 
@@ -53,6 +55,15 @@ namespace plug::com
     std::vector<std::uint8_t> MustangProtocolBase::receivePacket(Connection& conn)
     {
         return conn.receive(packetRawTypeSize);
+    }
+
+    Packet<EmptyPayload> MustangProtocolBase::serializeCommand(const char* command_hex_bytes)
+    {
+        Header header;
+        std::array<uint8_t, 16> headerBytes;
+        hexStringToArrayOf16Bytes(command_hex_bytes, headerBytes);
+        header.fromBytes(headerBytes);
+        return Packet<EmptyPayload>{header, EmptyPayload{}};
     }
 
     std::vector<std::array<std::uint8_t, 64>> MustangProtocolBase::receiveResponse(
@@ -101,6 +112,26 @@ namespace plug::com
                 return NULL;
         }
     }
+
+    void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outByteArray)
+    {
+        assert(inHexString.length()%2==0);
+
+        for (size_t i = 0; i<sizeof(outByteArray); ++i)
+        {
+            if(2*i<inHexString.length())
+            {
+                std::string byteString = inHexString.substr(2*i, 2);
+                uint8_t nextByte = static_cast<uint8_t>(strtol(byteString.c_str(), NULL, 16));
+                outByteArray[i] = nextByte;
+            }
+            else
+            {
+                outByteArray[i] = static_cast<uint8_t>(0);
+            }
+        }
+    }
+
 }
 
 

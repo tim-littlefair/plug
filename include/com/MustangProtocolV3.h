@@ -41,8 +41,6 @@ namespace plug::com
 
         InitialData loadPresetData(const std::shared_ptr<Connection> conn);
 
-        private:
-
         std::vector<std::vector<uint8_t>> sendCommandAndReceiveResponse(
             const char *command_description,
             const char *command_hex_bytes,

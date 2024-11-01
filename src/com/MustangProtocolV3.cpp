@@ -36,7 +36,6 @@
 
 // Forward declarations of helper functions
 // definitions of these are at the end of the file, after the namespace closes
-static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outHeaderBytes);
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label);
 
 namespace plug::com
@@ -128,11 +127,7 @@ namespace plug::com
 #ifndef NDEBUG
         std::cout << "Sending " << command_description << ":" << command_hex_bytes << std::endl;
 #endif
-        Header header;
-        std::array<uint8_t, 16> headerBytes;
-        hexStringToArrayOf16Bytes(command_hex_bytes, headerBytes);
-        header.fromBytes(headerBytes);
-        const auto command = Packet<EmptyPayload>{header, EmptyPayload{}};
+        auto command = serializeCommand(command_hex_bytes);
 
         auto recieved = (*m_ppConn)->send(command.getBytes());
 
@@ -191,27 +186,6 @@ namespace plug::com
 } // end of namespace
 
 // definitions of static helper functions
-
-static void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outByteArray)
-{
-    assert(inHexString.length()%2==0);
-
-    for (size_t i = 0; i<sizeof(outByteArray); ++i)
-    {
-        if(2*i<inHexString.length())
-        {
-            std::string byteString = inHexString.substr(2*i, 2);
-            uint8_t nextByte = static_cast<uint8_t>(strtol(byteString.c_str(), NULL, 16));
-            outByteArray[i] = nextByte;
-        }
-        else
-        {
-            outByteArray[i] = static_cast<uint8_t>(0);
-        }
-    }
-
-}
-
 
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label)
 {

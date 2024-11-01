@@ -54,10 +54,16 @@ namespace plug::com
         virtual std::array<Packet<EmptyPayload>,2> serializeInitCommand() = 0;
         virtual InitialData loadPresetData(const std::shared_ptr<Connection> conn) = 0;
 
+        Packet<EmptyPayload> serializeCommand(const char* hex_bytes);
+
         std::vector<std::array<std::uint8_t, 64>> receiveResponse(
             const std::shared_ptr<Connection> conn, bool lastPacketCheck=false
         );
     };
+
+    void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outByteArray);
 }
+
+
 
 

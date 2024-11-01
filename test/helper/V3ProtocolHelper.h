@@ -26,6 +26,7 @@ static  std::vector<std::uint8_t> buildProtobufPresetPayload(std::string presetF
     // V3 returns a large protobuf-wrapped JSON document containing the current preset
     std::ifstream emptyPresetJson(presetFilePath.c_str());
     std::vector<std::uint8_t> pbPayload;
+    assert(emptyPresetJson.good());
     std::vector<std::uint8_t> pbBeforeJson{
         0x08, 0x02, // magic=protobuf, protobuf_version=2
         0xfa, 0x01, // message tag as varint: vi_value=(0xfa&0x7f)+(0x01<<7)=0x7a+0x80=0xfa pbtype=(0xfa&0x07)=0x2 msgid=(0xfa&0xf8)>>3=32
@@ -39,13 +40,20 @@ static  std::vector<std::uint8_t> buildProtobufPresetPayload(std::string presetF
         pbBeforeJson.cend(),
         std::back_inserter(pbPayload)
     );
-    while(emptyPresetJson)
+    while(true)
     {
         uint8_t nextNonWsByte;
         emptyPresetJson >> std::skipws >> nextNonWsByte;
-        pbPayload.push_back(nextNonWsByte);
+        if(emptyPresetJson.good())
+        {
+            pbPayload.push_back(nextNonWsByte);
+        }
+        else
+        {
+            assert(emptyPresetJson.eof());
+            break;
+        }
     }
-    //assert(emptyPresetJson.eof());
     emptyPresetJson.close();
     // If the payload didn't end with a '}', something went wrong
     assert( pbPayload.at((pbPayload.size()-1)) == static_cast<uint8_t>(0x7d) );

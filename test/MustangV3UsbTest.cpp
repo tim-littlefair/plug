@@ -22,7 +22,7 @@
 #include "com/Packet.h"
 #include "com/PacketSerializer.h"
 #include "com/CommunicationException.h"
-#include "com/MustangProtocolBase.h"
+#include "com/MustangProtocolV3.h"
 #include "mocks/MockConnection.h"
 #include "matcher/Matcher.h"
 #include "matcher/TypeMatcher.h"
@@ -47,8 +47,9 @@ namespace plug::test
         {
             conn = std::make_shared<mock::MockConnection>();
             m = std::make_unique<com::Mustang>(DeviceModel{"V3 Test Device", DeviceModel::Category::MustangV3_USB, 60}, conn);
-            p = MustangProtocolBase::factory(m->getDeviceModel());
-            //loadCmd = p->serializeLoadCommand().getBytes();
+            auto pBase = MustangProtocolBase::factory(m->getDeviceModel());
+            p = dynamic_cast<MustangProtocolV3*>(pBase);
+            // loadCmd = p->serializeLoadCommand().getBytes();
         }
 
         void TearDown() override
@@ -69,12 +70,11 @@ namespace plug::test
 
         std::shared_ptr<mock::MockConnection> conn;
         std::unique_ptr<com::Mustang> m;
-        MustangProtocolBase *p;
+        MustangProtocolV3 *p;
         const std::vector<std::uint8_t> noData{};
         const std::vector<std::uint8_t> ignoreData = std::vector<std::uint8_t>(packetRawTypeSize);
         const std::vector<std::uint8_t> ignoreAmpData = []
         { std::vector<std::uint8_t> d(packetRawTypeSize, 0x00); d[16] = 0x5e; return d; }();
-        /*const*/ PacketRawType loadCmd /* = serializeLoadCommand().getBytes() */;
         const PacketRawType applyCmd = serializeApplyCommand().getBytes();
         static inline constexpr std::size_t numPresetPackets{200};
         static inline constexpr int slot{5};
@@ -140,14 +140,32 @@ namespace plug::test
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
         // Load cmd
+        PacketRawType loadCmd = p->serializeCommand("35070800c206020801").getBytes();
         EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
-        std::vector<std::vector<uint8_t>> packets = presetJsonFileToHIDPackets("../test/data/empty_payload.json");
-        ASSERT_EQ(packets.size(),30);
-        for (size_t i=0; i<packets.size(); ++i)
+        std::vector<std::vector<uint8_t>> currentPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"));
+        ASSERT_EQ(currentPresetPackets.size(),30);
+        for(size_t i=0; i<currentPresetPackets.size(); ++i)
         {
-            EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(packets[i]));
+            EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(currentPresetPackets[i]));
         }
 
+        for (size_t i=1; i<=m->getDeviceModel().numberOfPresets();++i)
+        {
+            PacketRawType presetCmd = p->serializePresetRequestCommand(i).getBytes();
+            std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"));
+            EXPECT_CALL(*conn, sendImpl(BufferIs(presetCmd), presetCmd.size())).WillOnce(Return(presetCmd.size()));
+            ASSERT_EQ(storedPresetPackets.size(),30);
+            for(size_t j=0; j<storedPresetPackets.size(); ++j)
+            {
+                EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(storedPresetPackets[j]));
+            }
+        }
+
+        const auto [signalChain, presets] = m->start_amp();
+        const std::string actualName{"EMPTY"};
+        EXPECT_THAT(signalChain.name(), StrEq(actualName));
+
+        static_cast<void>(presets);
 #if 0
 
 
