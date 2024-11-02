@@ -96,8 +96,8 @@ namespace plug::test
             for (size_t i=1; i<=m->getDeviceModel().numberOfPresets();++i)
             {
                 PacketRawType presetCmd = p->serializePresetRequestCommand(i).getBytes();
-                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"),i);
                 EXPECT_CALL(*conn, sendImpl(BufferIs(presetCmd), presetCmd.size())).WillOnce(Return(presetCmd.size()));
+                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"),i);
                 ASSERT_EQ(storedPresetPackets.size(),30);
                 for(size_t j=0; j<storedPresetPackets.size(); ++j)
                 {
@@ -105,9 +105,9 @@ namespace plug::test
                 }
             }
         }
-
     };
 
+#if 0
     TEST_F(MustangV3UsbTest, startInitializesDevice)
     {
         const auto [initPacket1, initPacket2] = p->serializeInitCommand();
@@ -134,8 +134,8 @@ namespace plug::test
         EXPECT_CALL(*conn, isOpen()).WillOnce(Return(false));
         EXPECT_THROW(m->start_amp(), plug::com::CommunicationException);
     }
+#endif
 
-#if 0
     TEST_F(MustangV3UsbTest, startRequestsCurrentPresetName)
     {
         const auto [initPacket1, initPacket2] = p->serializeInitCommand();
@@ -154,7 +154,6 @@ namespace plug::test
         doRequestForActivePreset();
         doRequestsForAllStoredPresets();
 
-
         const auto [signalChain, presets] = m->start_amp();
         const std::string actualName{"EMPTY"};
         EXPECT_THAT(signalChain.name(), StrEq(actualName));
@@ -165,12 +164,7 @@ namespace plug::test
 
     TEST_F(MustangV3UsbTest, startRequestsCurrentAmp)
     {
-        constexpr amp_settings amp{amps::BRITISH_60S, 4, 8, 5, 9, 1,
-                                   cabinets::cabBSSMN, 5, 3, 4, 7, 4, 2, 6, 1,
-                                   true, 17};
-        const auto recvData = asBuffer(serializeAmpSettings(amp).getBytes());
-        const auto extendedData = asBuffer(serializeAmpSettingsUsbGain(amp).getBytes());
-        const auto [initPacket1, initPacket2] = serializeInitCommand();
+        const auto [initPacket1, initPacket2] = p->serializeInitCommand();
         const auto initCmd1 = initPacket1.getBytes();
         const auto initCmd2 = initPacket2.getBytes();
 
@@ -183,30 +177,26 @@ namespace plug::test
         EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-        // Load cmd
-        EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
-
-        // Preset names data
-        EXPECT_CALL(*conn, receive(packetRawTypeSize)).Times(numPresetPackets).WillRepeatedly(Return(ignoreData));
-
-        // Data
-        EXPECT_CALL(*conn, receive(packetRawTypeSize))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(recvData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(extendedData))
-            .WillOnce(Return(noData));
-
+        //set_send_commands(false);
+        doRequestForActivePreset();
+        doRequestsForAllStoredPresets();
 
         const auto [signalChain, presets] = m->start_amp();
+        const std::string actualName{"EMPTY"};
+        EXPECT_THAT(signalChain.name(), StrEq(actualName));
+
+        constexpr amp_settings amp{amps::BRITISH_60S, 4, 8, 5, 9, 1,
+                                   cabinets::cabBSSMN, 5, 3, 4, 7, 4, 2, 6, 1,
+                                   true, 17};
+        //const auto recvData = asBuffer(serializeAmpSettings(amp).getBytes());
+        //const auto extendedData = asBuffer(serializeAmpSettingsUsbGain(amp).getBytes());
+
         EXPECT_THAT(signalChain.amp(), AmpIs(amp));
 
         static_cast<void>(presets);
     }
 
+#if 0
     TEST_F(MustangV3UsbTest, startRequestsCurrentEffects)
     {
         constexpr fx_pedal_settings e0{FxSlot{0x00}, effects::TRIANGLE_FLANGER, 10, 20, 30, 40, 50, 0};

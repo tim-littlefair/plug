@@ -139,7 +139,7 @@ namespace plug::com
                 "Empty response to %s request",
                 command_description
             );
-            throw CommunicationException(exception_message);
+            throw CommunicationException(std::string(exception_message));
         }
 
         const auto receivedData = receiveResponse((*m_ppConn), true);
