@@ -126,7 +126,10 @@ namespace plug
     {
         std::for_each(ampNames.cbegin(), ampNames.cend(), [this, model](const auto& item)
                       {
-                if (!isV2Amp(item.first) || (isV2Amp(item.first) && model.category() == DeviceModel::Category::MustangV2)){
+                if (!isV2Amp(item.first) ||
+                    (isV2Amp(item.first) && model.category() == DeviceModel::Category::MustangV2) ||
+                    (isV2Amp(item.first) && model.category() == DeviceModel::Category::MustangV3_USB)
+                ){
                 ui->comboBox->addItem(QString::fromStdString(item.second));} });
     }
 
