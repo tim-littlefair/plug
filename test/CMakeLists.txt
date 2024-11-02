@@ -13,7 +13,6 @@ add_subdirectory(mocks)
 
 add_executable(MustangTest
                 MustangTest.cpp
-                MustangV3UsbTest.cpp
                 PacketSerializerTest.cpp
                 PacketTest.cpp
                 FxSlotTest.cpp
@@ -27,7 +26,16 @@ target_link_libraries(MustangTest PRIVATE
                         LibUsbMocks
                         )
 
-
+add_executable(MustangV3UsbTest
+                MustangV3UsbTest.cpp
+                )
+add_test(MustangV3Test MustangV3UsbTest)
+target_link_libraries(MustangV3UsbTest PRIVATE
+                        plug-mustang
+                        plug-communication
+                        TestLibs
+                        LibUsbMocks
+                        )
 
 add_executable(CommunicationTest
                 ConnectionFactoryTest.cpp

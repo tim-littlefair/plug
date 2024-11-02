@@ -107,7 +107,6 @@ namespace plug::test
         }
     };
 
-#if 0
     TEST_F(MustangV3UsbTest, startInitializesDevice)
     {
         const auto [initPacket1, initPacket2] = p->serializeInitCommand();
@@ -134,7 +133,6 @@ namespace plug::test
         EXPECT_CALL(*conn, isOpen()).WillOnce(Return(false));
         EXPECT_THROW(m->start_amp(), plug::com::CommunicationException);
     }
-#endif
 
     TEST_F(MustangV3UsbTest, startRequestsCurrentPresetName)
     {
@@ -177,7 +175,6 @@ namespace plug::test
         EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-        //set_send_commands(false);
         doRequestForActivePreset();
         doRequestsForAllStoredPresets();
 
@@ -185,32 +182,19 @@ namespace plug::test
         const std::string actualName{"EMPTY"};
         EXPECT_THAT(signalChain.name(), StrEq(actualName));
 
-        constexpr amp_settings amp{amps::BRITISH_60S, 4, 8, 5, 9, 1,
-                                   cabinets::cabBSSMN, 5, 3, 4, 7, 4, 2, 6, 1,
-                                   true, 17};
-        //const auto recvData = asBuffer(serializeAmpSettings(amp).getBytes());
-        //const auto extendedData = asBuffer(serializeAmpSettingsUsbGain(amp).getBytes());
-
+        constexpr amp_settings amp{amps::STUDIO_PREAMP, 5, 0, 5, 5, 5,
+                                   cabinets::OFF, 0, 0, 0, 0, 0, 0, 0, 0,
+                                   false, 0};
         EXPECT_THAT(signalChain.amp(), AmpIs(amp));
 
         static_cast<void>(presets);
     }
 
-#if 0
     TEST_F(MustangV3UsbTest, startRequestsCurrentEffects)
     {
-        constexpr fx_pedal_settings e0{FxSlot{0x00}, effects::TRIANGLE_FLANGER, 10, 20, 30, 40, 50, 0};
-        constexpr fx_pedal_settings e1{FxSlot{0x01}, effects::TRIANGLE_CHORUS, 0, 0, 0, 1, 1, 1};
-        constexpr fx_pedal_settings e2{FxSlot{0x02}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
-        constexpr fx_pedal_settings e3{FxSlot{0x03}, effects::TAPE_DELAY, 1, 2, 3, 4, 5, 6};
-        const auto recvData0 = asBuffer(serializeEffectSettings(e0).getBytes());
-        const auto recvData1 = asBuffer(serializeEffectSettings(e1).getBytes());
-        const auto recvData2 = asBuffer(serializeEffectSettings(e2).getBytes());
-        const auto recvData3 = asBuffer(serializeEffectSettings(e3).getBytes());
-        const auto [initPacket1, initPacket2] = serializeInitCommand();
+        const auto [initPacket1, initPacket2] = p->serializeInitCommand();
         const auto initCmd1 = initPacket1.getBytes();
         const auto initCmd2 = initPacket2.getBytes();
-
 
         InSequence s;
         EXPECT_CALL(*conn, isOpen()).WillOnce(Return(true));
@@ -221,34 +205,39 @@ namespace plug::test
         EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-        // Load cmd
-        EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
-
-        // Preset names data
-        EXPECT_CALL(*conn, receive(packetRawTypeSize)).Times(numPresetPackets).WillRepeatedly(Return(ignoreData));
-
-        // Data
-        EXPECT_CALL(*conn, receive(packetRawTypeSize))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreAmpData))
-            .WillOnce(Return(recvData0))
-            .WillOnce(Return(recvData1))
-            .WillOnce(Return(recvData2))
-            .WillOnce(Return(recvData3))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(noData));
-
+        doRequestForActivePreset();
+        doRequestsForAllStoredPresets();
 
         const auto [signalChain, presets] = m->start_amp();
+
+#if 0
+        // values from original MustangTest
+        constexpr fx_pedal_settings e0{FxSlot{0x00}, effects::TRIANGLE_FLANGER, 10, 20, 30, 40, 50, 0};
+        constexpr fx_pedal_settings e1{FxSlot{0x01}, effects::TRIANGLE_CHORUS, 0, 0, 0, 1, 1, 1};
+        constexpr fx_pedal_settings e2{FxSlot{0x02}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
+        constexpr fx_pedal_settings e3{FxSlot{0x03}, effects::TAPE_DELAY, 1, 2, 3, 4, 5, 6};
+#else
+        // Values for MustangV3UsbTest based on EMPTY preset
+        constexpr fx_pedal_settings e0{FxSlot{0x00}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
+        constexpr fx_pedal_settings e1{FxSlot{0x01}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
+        constexpr fx_pedal_settings e2{FxSlot{0x02}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
+        constexpr fx_pedal_settings e3{FxSlot{0x03}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
+#endif
+        const auto recvData0 = asBuffer(serializeEffectSettings(e0).getBytes());
+        const auto recvData1 = asBuffer(serializeEffectSettings(e1).getBytes());
+        const auto recvData2 = asBuffer(serializeEffectSettings(e2).getBytes());
+        const auto recvData3 = asBuffer(serializeEffectSettings(e3).getBytes());
 
         EXPECT_THAT(signalChain.effects()[0], EffectIs(e0));
 
         static_cast<void>(presets);
     }
 
+#if 0
+
     TEST_F(MustangV3UsbTest, startRequestsAmpPresetList)
     {
-        const auto [initPacket1, initPacket2] = serializeInitCommand();
+        const auto [initPacket1, initPacket2] = p->serializeInitCommand();
         const auto initCmd1 = initPacket1.getBytes();
         const auto initCmd2 = initPacket2.getBytes();
         const auto recvData0 = asBuffer(serializeName(0, "abc").getBytes());
@@ -302,7 +291,7 @@ namespace plug::test
 
     TEST_F(MustangV3UsbTest, startUsesFullInitialTransmissionSizeIfOverThreshold)
     {
-        const auto [initPacket1, initPacket2] = serializeInitCommand();
+        const auto [initPacket1, initPacket2] = p->serializeInitCommand();
         const auto initCmd1 = initPacket1.getBytes();
         const auto initCmd2 = initPacket2.getBytes();
 
