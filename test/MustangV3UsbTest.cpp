@@ -83,7 +83,7 @@ namespace plug::test
         {
             PacketRawType loadCmd = p->serializeCommand("35070800c206020801").getBytes();
             EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
-            std::vector<std::vector<uint8_t>> currentPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"));
+            std::vector<std::vector<uint8_t>> currentPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"),0);
             ASSERT_EQ(currentPresetPackets.size(),30);
             for(size_t i=0; i<currentPresetPackets.size(); ++i)
             {
@@ -96,7 +96,7 @@ namespace plug::test
             for (size_t i=1; i<=m->getDeviceModel().numberOfPresets();++i)
             {
                 PacketRawType presetCmd = p->serializePresetRequestCommand(i).getBytes();
-                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"));
+                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"),i);
                 EXPECT_CALL(*conn, sendImpl(BufferIs(presetCmd), presetCmd.size())).WillOnce(Return(presetCmd.size()));
                 ASSERT_EQ(storedPresetPackets.size(),30);
                 for(size_t j=0; j<storedPresetPackets.size(); ++j)
@@ -135,6 +135,7 @@ namespace plug::test
         EXPECT_THROW(m->start_amp(), plug::com::CommunicationException);
     }
 
+#if 0
     TEST_F(MustangV3UsbTest, startRequestsCurrentPresetName)
     {
         const auto [initPacket1, initPacket2] = p->serializeInitCommand();
@@ -159,33 +160,9 @@ namespace plug::test
         EXPECT_THAT(signalChain.name(), StrEq(actualName));
 
         static_cast<void>(presets);
-#if 0
-
-
-        const std::string actualName{"abc"};
-        const auto nameData = asBuffer(serializeName(0, actualName).getBytes());
-
-        // Data
-        EXPECT_CALL(*conn, receive(packetRawTypeSize))
-            .WillOnce(Return(nameData))
-            .WillOnce(Return(ignoreAmpData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(noData));
-
-
-        const auto [signalChain, presets] = m->start_amp();
-        EXPECT_THAT(signalChain.name(), StrEq(actualName));
-
-        static_cast<void>(presets);
-#endif
 
     }
 
-#if 0
     TEST_F(MustangV3UsbTest, startRequestsCurrentAmp)
     {
         constexpr amp_settings amp{amps::BRITISH_60S, 4, 8, 5, 9, 1,

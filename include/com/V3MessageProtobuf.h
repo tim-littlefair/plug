@@ -23,6 +23,9 @@
 
 #include <cassert>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 namespace plug::com::v3
 {
     static std::vector<uint8_t> array64_to_vector(std::array<uint8_t,64> a)
@@ -40,6 +43,7 @@ namespace plug::com::v3
         {
             uint8_t next_byte = p[protobuf_read_offset];
             ++protobuf_read_offset;
+            assert(protobuf_read_offset<p.size());
             if( (next_byte&0x80) == 0 )
             {
                 retval += next_byte * multiplier;
@@ -52,6 +56,31 @@ namespace plug::com::v3
             }
         } while(true);
         return retval;
+    }
+
+    // Note that we can read a varint starting from anywhere in the vector, but we don't know
+    // how many bytes the varint contains until we calculate it so the only place we can
+    // insert it is at the end.
+    // Therefore we have _read_ and _append_ methods, not _read_ and _write_
+    static std::vector<uint8_t>& protobuf_append_varint(unsigned int value, std::vector<uint8_t>& target)
+    {
+        unsigned int remaining_value = value;
+        do
+        {
+            if ( (remaining_value & 0x80) == 0 )
+            {
+                target.push_back(static_cast<uint32_t>(remaining_value));
+                break;
+            }
+            else
+            {
+                uint8_t next_byte = remaining_value & 0x7F;
+                remaining_value >>= 7;
+                target.push_back(next_byte);
+            }
+        } while(true);
+
+        return target;
     }
 
     /*
@@ -153,5 +182,6 @@ namespace plug::com::v3
         return retval;
     }
 
+#pragma GCC diagnostic pop
 
 }

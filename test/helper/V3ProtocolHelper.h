@@ -21,48 +21,128 @@
 
 #pragma once
 
-static  std::vector<std::uint8_t> buildProtobufPresetPayload(std::string presetFilePath)
+#include "com/V3MessageProtobuf.h"
+#include <cctype>
+#include <cassert>
+#include <vector>
+
+static std::vector<std::uint8_t> readPresetJson(std::string presetFilePath)
 {
-    // V3 returns a large protobuf-wrapped JSON document containing the current preset
-    std::ifstream emptyPresetJson(presetFilePath.c_str());
-    std::vector<std::uint8_t> pbPayload;
-    assert(emptyPresetJson.good());
+    std::ifstream presetJson(presetFilePath.c_str());
+    std::vector<std::uint8_t> jsonPayload;
+    assert(presetJson.good());
+
+    while(true)
+    {
+        uint8_t nextNonWsByte;
+        presetJson >> std::skipws >> nextNonWsByte;
+        if(presetJson.good())
+        {
+            jsonPayload.push_back(nextNonWsByte);
+        }
+        else
+        {
+            assert(presetJson.eof());
+            break;
+        }
+    }
+    presetJson.close();
+    // If the payload didn't end with a '}', something went wrong
+    assert( jsonPayload.at((jsonPayload.size()-1)) == static_cast<uint8_t>(0x7d) );
+
+    return jsonPayload;
+
+}
+
+static  std::vector<std::uint8_t> buildProtobufPresetPayload(std::string presetFilePath, uint8_t presetIndex)
+{
+    // The protobuf type of the outer message structure is 'LEN'
+    // which represents a sequence of bytes, preceded by the length
+    // of the sequence encoded as a single varint
+    const unsigned int PB_MESSAGE_TYPE_LEN = 2;
+
     std::vector<std::uint8_t> pbBeforeJson{
         0x08, 0x02, // magic=protobuf, protobuf_version=2
-        0xfa, 0x01, // message tag as varint: vi_value=(0xfa&0x7f)+(0x01<<7)=0x7a+0x80=0xfa pbtype=(0xfa&0x07)=0x2 msgid=(0xfa&0xf8)>>3=32
-        0x98, 0x0f, // because pbtype=2 message length as varint: vi_value=(0x98&0x7f)+(0x0f<<7)=0x18+0x780=0x798 = 1944 decimal
-        0x0a, // element tag for first field, pbtype=0x02, fieldid=0x01
-        0x93, 0x0f, // because pbtype=2, field length as varint: vi_value=(0x93&0x7f)+(0x0f<<7)=0x13+0x780=0x793 = 1939 decimal
-        // packet continues 0x7b, 0x22, 0x63, 0x6f ... but we will get these from empty_preset.json
     };
+    std::vector<std::uint8_t> pbAfterJson;
+
+    if (presetIndex==0)
+    {
+        // valid stored preset indices are in the range 1-n where n reflects DeviceModel::numberOfPresets()
+        // We use the value 0 as an indicator for requesting the current active preset, which is a different
+        // function
+        const unsigned int MSG_ID_ACTIVE_PRESET_REQUEST = 16;
+        unsigned int pb_message_tag = (MSG_ID_ACTIVE_PRESET_REQUEST<<3) + PB_MESSAGE_TYPE_LEN;
+        plug::com::v3::protobuf_append_varint(pb_message_tag, pbBeforeJson);
+
+        //assert(pbBeforeJson==std::vector<std::uint8_t>{0x08, 0x02, 0x82, 0x02});
+
+        pbAfterJson = std::vector<uint8_t>{
+            0x10, // element tag for second field, element type 0=single byte, element id 2=field 2
+            0x01, // element value for second field, (active preset is factory state?)
+            0x18, // element tag for third field, element type 0=single byte , element id 3=field 3
+            0x00,  // element value, active preset is not dirty
+        };
+    }
+    else
+    {
+        const unsigned int MSG_ID_STORED_PRESET_REQUEST = 32;
+        unsigned int pb_message_tag = (MSG_ID_STORED_PRESET_REQUEST<<3) + PB_MESSAGE_TYPE_LEN;
+        plug::com::v3::protobuf_append_varint(pb_message_tag, pbBeforeJson);
+        //assert(pbBeforeJson==std::vector<std::uint8_t{0x08, 0x02, 0xfa, 0x01});
+
+        pbAfterJson = std::vector<uint8_t>{
+            0x10, // element tag for second field, element type 0=single byte, element id 2=field 2
+            presetIndex, // element value for second field
+        };
+    }
+
+    // V3 returns a large protobuf-wrapped JSON document containing the current preset
+    // We need to read the JSON stream so that and determine its length before we
+    // can add the last required bytes to pbBeforeJson
+    std::vector<uint8_t> jsonPayload = readPresetJson(presetFilePath);
+
+    unsigned int jsonFieldLength = jsonPayload.size();
+
+    unsigned int jsonLengthLength;
+    if (jsonFieldLength<0x80)
+    {
+        // length of JSON field will be encoded as a
+        // single-byte varint (unlikely, but we handle it)
+        jsonLengthLength = 1;
+    }
+    else
+    {
+        // No support for messages long enough to require
+        // a 3-byte varint length
+        assert(jsonFieldLength<0x4000);
+        jsonLengthLength = 2;
+    }
+
+    unsigned int pbMessageLength = (
+        1 + // field tag for the JSON field
+        jsonLengthLength + // length of the varint encoding the JSON field length
+        jsonFieldLength + // length of the JSON
+        pbAfterJson.size()
+    );
+
+    // finally we can close out the values in pbBeforeJson
+    plug::com::v3::protobuf_append_varint(pbMessageLength, pbBeforeJson);
+    pbBeforeJson.push_back(0x0a); // field tag for the JSON
+    plug::com::v3::protobuf_append_varint(jsonFieldLength,pbBeforeJson);
+
+    // Finally we put the three parts together
+    std::vector<std::uint8_t> pbPayload;
     std::copy(
         pbBeforeJson.cbegin(),
         pbBeforeJson.cend(),
         std::back_inserter(pbPayload)
     );
-    while(true)
-    {
-        uint8_t nextNonWsByte;
-        emptyPresetJson >> std::skipws >> nextNonWsByte;
-        if(emptyPresetJson.good())
-        {
-            pbPayload.push_back(nextNonWsByte);
-        }
-        else
-        {
-            assert(emptyPresetJson.eof());
-            break;
-        }
-    }
-    emptyPresetJson.close();
-    // If the payload didn't end with a '}', something went wrong
-    assert( pbPayload.at((pbPayload.size()-1)) == static_cast<uint8_t>(0x7d) );
-    std::vector<std::uint8_t> pbAfterJson{
-        0x10, // element tag for second field, element type 0=single byte, element id 2=field 2
-        0x01, // element value for second field
-        0x18, // element tag for third field, element type 0=single byte , element id 3=field 3
-        0x00,  // element value, preset is not dirty
-    };
+    std::copy(
+        jsonPayload.cbegin(),
+        jsonPayload.cend(),
+        std::back_inserter(pbPayload)
+    );
     std::copy(
         pbAfterJson.cbegin(),
         pbAfterJson.cend(),
@@ -114,9 +194,9 @@ static std::vector<std::vector<uint8_t>> payloadToHIDPackets(std::vector<uint8_t
     return packets;
 }
 
-static std::vector<std::vector<uint8_t>> presetJsonFileToHIDPackets(std::string presetFilePath)
+static std::vector<std::vector<uint8_t>> presetJsonFileToHIDPackets(std::string presetFilePath, uint8_t storedPresetIndex)
 {
-    std::vector<std::uint8_t> payloadBytes = buildProtobufPresetPayload(presetFilePath);
+    std::vector<std::uint8_t> payloadBytes = buildProtobufPresetPayload(presetFilePath, storedPresetIndex);
     return payloadToHIDPackets(payloadBytes);
 
 }
