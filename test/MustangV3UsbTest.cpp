@@ -107,7 +107,7 @@ namespace plug::test
         }
 
     };
-#if 0
+
     TEST_F(MustangV3UsbTest, startInitializesDevice)
     {
         const auto [initPacket1, initPacket2] = p->serializeInitCommand();
@@ -123,23 +123,8 @@ namespace plug::test
         EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-        // Load cmd
-        EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
-
-        // Preset names data
-        EXPECT_CALL(*conn, receive(packetRawTypeSize)).Times(numPresetPackets).WillRepeatedly(Return(ignoreData));
-
-        // Data
-        EXPECT_CALL(*conn, receive(packetRawTypeSize))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreAmpData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(noData));
-
+        doRequestForActivePreset();
+        doRequestsForAllStoredPresets();
 
         m->start_amp();
     }
@@ -149,7 +134,6 @@ namespace plug::test
         EXPECT_CALL(*conn, isOpen()).WillOnce(Return(false));
         EXPECT_THROW(m->start_amp(), plug::com::CommunicationException);
     }
-#endif
 
     TEST_F(MustangV3UsbTest, startRequestsCurrentPresetName)
     {
