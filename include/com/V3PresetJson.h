@@ -26,6 +26,7 @@
 #include <fstream>
 
 #include <cassert>
+#include <cstring> // for memset
 
 #include <qt6/QtCore/QJsonParseError>
 #include <qt6/QtCore/QByteArray>
@@ -92,22 +93,29 @@ namespace plug::com::v3
     #ifndef NDEBUG
                 std::cout << "Getting settings for amp with FenderId " << qPrintable(nodeFenderId) << " type " << (0 + value(ampId)) << std::endl;
     #endif
+                memset(&presetAmpSettings, 0, sizeof(presetAmpSettings));
                 presetAmpSettings.amp_num = ampId;
-                presetAmpSettings.bass = node.value(QStringLiteral("bass")).toDouble();
-                presetAmpSettings.bias = node.value(QStringLiteral("bias")).toInt();
-        /*
-                //presentAmpSettings.brightness = node.value(QStringLiteral("brightness")).toDouble();
-                presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-                presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
+                auto ampParams = node.value(QStringLiteral("dspUnitParameters")).toObject();
+                presetAmpSettings.gain = std::round(10.0 * ampParams.value(QStringLiteral("gain")).toDouble());
+                presetAmpSettings.volume = std::round(10.0 * ampParams.value(QStringLiteral("volume")).toDouble());
 
-                presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-                presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-                presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-                presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-                presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-                presentAmpSettings.bass = node.value(QStringLiteral("base")).toDouble();
-        */
+                presetAmpSettings.treble = std::round(10.0 * ampParams.value(QStringLiteral("treb")).toDouble());
+                presetAmpSettings.middle = std::round(10.0 * ampParams.value(QStringLiteral("mid")).toDouble());
+                presetAmpSettings.bass = std::round(10.0 * ampParams.value(QStringLiteral("bass")).toDouble());
 
+                /*
+                presetAmpSettings.cabinet = cabinets::OFF;
+                presetAmpSettings.noise_gate = 208;
+                presetAmpSettings.threshold = 30;
+                presetAmpSettings.master_vol = 229;
+                presetAmpSettings.gain2 = 74;
+                presetAmpSettings.presence = 1;
+                presetAmpSettings.depth = 86;
+                presetAmpSettings.bias = 0;
+                presetAmpSettings.sag = 0;
+                presetAmpSettings.brightness = 88;
+                presetAmpSettings.usb_gain = 76;
+                */
             }
             else
             {
