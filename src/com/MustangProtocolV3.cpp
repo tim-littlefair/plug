@@ -82,12 +82,17 @@ namespace plug::com
         int response_type_received;
         std::vector<std::vector<uint8_t>> current_preset_response_bytes = sendCommandAndReceiveResponse("current_preset","35070800c206020801", response_type_received);
         debug_dump_hex(current_preset_response_bytes[0],"current_preset");
-        for(int i=1; i<=8; ++i)
+        for(int i=1; i<=4; ++i)
         {
-            fx_pedal_settings ps{FxSlot{0}, effects::EMPTY, 0, 0, 0, 0, 0, 0, false};
+            fx_pedal_settings ps{FxSlot{0}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
             presetEffects.push_back(ps);
         }
         plug::com::v3::parse_preset_json(current_preset_response_bytes[1], "current_preset", currentPresetName, presetAmpSettings, presetEffects);
+        assert(current_preset_response_bytes.size()==3);
+        assert(current_preset_response_bytes[2].size()==4);
+        assert(current_preset_response_bytes[2][0]==0x10);
+        uint8_t current_preset_index = current_preset_response_bytes[2][1];
+        static_cast<void>(current_preset_index);
 
         for(int i=1; i<=60; ++i)
         {

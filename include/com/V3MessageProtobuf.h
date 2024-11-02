@@ -38,21 +38,21 @@ namespace plug::com::v3
     static unsigned int protobuf_read_varint(std::vector<uint8_t> p, size_t& protobuf_read_offset)
     {
         unsigned int retval=0;
-        unsigned int multiplier = 1;
+        unsigned int multiplier_shift=0;
         do
         {
             uint8_t next_byte = p[protobuf_read_offset];
             ++protobuf_read_offset;
             assert(protobuf_read_offset<p.size());
-            if( (next_byte&0x80) == 0 )
+            if (next_byte<0x80)
             {
-                retval += next_byte * multiplier;
+                retval += next_byte<<multiplier_shift;
                 break;
             }
             else
             {
-                retval += (next_byte&0x7F) * multiplier;
-                multiplier *= 128;
+                retval += (next_byte&0x7F);
+                multiplier_shift += 7;
             }
         } while(true);
         return retval;
@@ -120,7 +120,7 @@ namespace plug::com::v3
                 // in higher bits
                 unsigned int fender_message_tag = protobuf_read_varint(array64_to_vector(p), protobuf_read_offset);
                 assert( (fender_message_tag & 0x07) == 2); // protobuf type of whole message is 'LEN'
-                fender_message_type = (fender_message_tag&0xFFFFFFF80) >> 3;
+                fender_message_type = (fender_message_tag) >> 3;
             }
             assert(fender_message_type!=-1);
 
@@ -150,8 +150,7 @@ namespace plug::com::v3
             // fixed format parameters
             // The JSON document will be returned in retval[1], retval[2] will contain
             // all other parameters
-            case 16: // ?
-            case 31: // presetJSONMessage?
+            case 31: // presetJSONMessage
             case 32: // currentPresetStatus
                 {
                     unsigned int preset_json_length = protobuf_read_varint(retval[0],protobuf_read_offset);
