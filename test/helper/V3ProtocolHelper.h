@@ -71,11 +71,12 @@ static  std::vector<std::uint8_t> buildProtobufPresetPayload(std::string presetF
         // valid stored preset indices are in the range 1-n where n reflects DeviceModel::numberOfPresets()
         // We use the value 0 as an indicator for requesting the current active preset, which is a different
         // function
-        const unsigned int MSG_ID_ACTIVE_PRESET_REQUEST = 16;
+        const unsigned int MSG_ID_ACTIVE_PRESET_REQUEST = 32;
         unsigned int pb_message_tag = (MSG_ID_ACTIVE_PRESET_REQUEST<<3) + PB_MESSAGE_TYPE_LEN;
+        assert(pb_message_tag==258);
         plug::com::v3::protobuf_append_varint(pb_message_tag, pbBeforeJson);
-
-        //assert(pbBeforeJson==std::vector<std::uint8_t>{0x08, 0x02, 0x82, 0x02});
+        assert(pbBeforeJson[02]==0x82);
+        assert(pbBeforeJson[03]==0x02);
 
         pbAfterJson = std::vector<uint8_t>{
             0x10, // element tag for second field, element type 0=single byte, element id 2=field 2
@@ -86,10 +87,12 @@ static  std::vector<std::uint8_t> buildProtobufPresetPayload(std::string presetF
     }
     else
     {
-        const unsigned int MSG_ID_STORED_PRESET_REQUEST = 32;
+        const unsigned int MSG_ID_STORED_PRESET_REQUEST = 31;
         unsigned int pb_message_tag = (MSG_ID_STORED_PRESET_REQUEST<<3) + PB_MESSAGE_TYPE_LEN;
+        assert(pb_message_tag==250);
         plug::com::v3::protobuf_append_varint(pb_message_tag, pbBeforeJson);
-        //assert(pbBeforeJson==std::vector<std::uint8_t{0x08, 0x02, 0xfa, 0x01});
+        assert(pbBeforeJson[2]==0xfa);
+        assert(pbBeforeJson[3]==0x01);
 
         pbAfterJson = std::vector<uint8_t>{
             0x10, // element tag for second field, element type 0=single byte, element id 2=field 2

@@ -67,14 +67,14 @@ namespace plug::com::v3
         unsigned int remaining_value = value;
         do
         {
-            if ( (remaining_value & 0x80) == 0 )
+            if (remaining_value < 0x80)
             {
                 target.push_back(static_cast<uint32_t>(remaining_value));
                 break;
             }
             else
             {
-                uint8_t next_byte = remaining_value & 0x7F;
+                uint8_t next_byte = 0x80 + (remaining_value & 0x7F);
                 remaining_value >>= 7;
                 target.push_back(next_byte);
             }
