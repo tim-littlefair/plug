@@ -90,18 +90,19 @@ namespace plug::com::v3
             if (whichNode==QStringLiteral("amp"))
             {
                 auto ampId = plug::com::v3::jsonNameToAmpId(std::string(qPrintable(nodeFenderId)));
-    #ifndef NDEBUG
-                std::cout << "Getting settings for amp with FenderId " << qPrintable(nodeFenderId) << " type " << (0 + value(ampId)) << std::endl;
-    #endif
                 memset(&presetAmpSettings, 0, sizeof(presetAmpSettings));
                 presetAmpSettings.amp_num = ampId;
                 auto ampParams = node.value(QStringLiteral("dspUnitParameters")).toObject();
-                presetAmpSettings.gain = std::round(10.0 * ampParams.value(QStringLiteral("gain")).toDouble());
-                presetAmpSettings.volume = std::round(10.0 * ampParams.value(QStringLiteral("volume")).toDouble());
 
+                // plug (and presumably Mustang V1 and V2 protocols) record these settings as bytes on a 0-10 scale,
+                // Mustang LT series JSON returns floats in the range 0.0 .. 1.0
+                presetAmpSettings.gain = std::round(10.0 * ampParams.value(QStringLiteral("gain")).toDouble());
                 presetAmpSettings.treble = std::round(10.0 * ampParams.value(QStringLiteral("treb")).toDouble());
                 presetAmpSettings.middle = std::round(10.0 * ampParams.value(QStringLiteral("mid")).toDouble());
                 presetAmpSettings.bass = std::round(10.0 * ampParams.value(QStringLiteral("bass")).toDouble());
+
+                // volumes of factory presets range from about -25.25 to 0.0)
+                presetAmpSettings.volume = std::round( (30.0+ampParams.value(QStringLiteral("volume")).toDouble())/3.0 );
 
                 /*
                 presetAmpSettings.cabinet = cabinets::OFF;
@@ -119,9 +120,6 @@ namespace plug::com::v3
             }
             else
             {
-    #ifndef NDEBUG
-                std::cout << "Ignoring node of type " << qPrintable(whichNode) << " with FenderId " << qPrintable(nodeFenderId) << std::endl;
-    #endif
             }
         }
         assert(presetEffects.size()>=1);

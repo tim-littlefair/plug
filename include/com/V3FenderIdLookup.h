@@ -81,38 +81,23 @@ namespace plug::com::v3
         auto pPair = json_amp_names.find(jsonName);
         if(pPair!=json_amp_names.cend())
         {
-#ifndef NDEBUG
-        std::cout << "jsonNameToAmpId: " << jsonName << " -> " << static_cast<unsigned int>(value(pPair->second)) << std::endl;
-#endif
             return pPair->second;
         }
         else
         {
-#ifndef NDEBUG
-        std::cout << "jsonNameToAmpId: " << jsonName << " not recognized " << std::endl;
-#endif
             return plug::amps::V3_NOT_RECOGNIZED;
         }
     }
 
     std::string ampIdToJsonName(plug::amps ampId)
     {
-#ifndef NDEBUG
-        auto ampIdAsUInt = static_cast<unsigned int>(value(ampId));
-#endif
         auto pPair = json_amp_names_reverse.find(ampId);
         if(pPair!=json_amp_names_reverse.cend())
         {
-#ifndef NDEBUG
-        std::cout << "ampIdToJsonName: " << ampIdAsUInt  << " -> " << pPair->second << std::endl;
-#endif
             return pPair->second;
         }
         else
         {
-    #ifndef _NDEBUG
-        std::cout << "ampIdToJsonName: " << ampIdAsUInt << " not recognized " << std::endl;
-    #endif
             return "V3_NOT_RECOGNIZED";
         }
     }

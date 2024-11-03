@@ -1,0 +1,210 @@
+{
+    "audioGraph": {
+        "connections": [
+            {
+                "input": {
+                    "index": 0,
+                    "nodeId": "preset"
+                },
+                "output": {
+                    "index": 0,
+                    "nodeId": "stomp"
+                }
+            },
+            {
+                "input": {
+                    "index": 1,
+                    "nodeId": "preset"
+                },
+                "output": {
+                    "index": 1,
+                    "nodeId": "stomp"
+                }
+            },
+            {
+                "input": {
+                    "index": 0,
+                    "nodeId": "stomp"
+                },
+                "output": {
+                    "index": 0,
+                    "nodeId": "mod"
+                }
+            },
+            {
+                "input": {
+                    "index": 1,
+                    "nodeId": "stomp"
+                },
+                "output": {
+                    "index": 1,
+                    "nodeId": "mod"
+                }
+            },
+            {
+                "input": {
+                    "index": 0,
+                    "nodeId": "mod"
+                },
+                "output": {
+                    "index": 0,
+                    "nodeId": "amp"
+                }
+            },
+            {
+                "input": {
+                    "index": 1,
+                    "nodeId": "mod"
+                },
+                "output": {
+                    "index": 1,
+                    "nodeId": "amp"
+                }
+            },
+            {
+                "input": {
+                    "index": 0,
+                    "nodeId": "amp"
+                },
+                "output": {
+                    "index": 0,
+                    "nodeId": "delay"
+                }
+            },
+            {
+                "input": {
+                    "index": 1,
+                    "nodeId": "amp"
+                },
+                "output": {
+                    "index": 1,
+                    "nodeId": "delay"
+                }
+            },
+            {
+                "input": {
+                    "index": 0,
+                    "nodeId": "delay"
+                },
+                "output": {
+                    "index": 0,
+                    "nodeId": "reverb"
+                }
+            },
+            {
+                "input": {
+                    "index": 1,
+                    "nodeId": "delay"
+                },
+                "output": {
+                    "index": 1,
+                    "nodeId": "reverb"
+                }
+            },
+            {
+                "input": {
+                    "index": 0,
+                    "nodeId": "reverb"
+                },
+                "output": {
+                    "index": 0,
+                    "nodeId": "preset"
+                }
+            },
+            {
+                "input": {
+                    "index": 1,
+                    "nodeId": "reverb"
+                },
+                "output": {
+                    "index": 1,
+                    "nodeId": "preset"
+                }
+            }
+        ],
+        "nodes": [
+            {
+                "FenderId": "DUBS_Passthru",
+                "dspUnitParameters": {
+                },
+                "nodeId": "stomp",
+                "nodeType": "dspUnit"
+            },
+            {
+                "FenderId": "DUBS_ChorusTriangle",
+                "dspUnitParameters": {
+                    "avgDelay": 0.22,
+                    "bypass": false,
+                    "bypassType": "Post",
+                    "depth": 1,
+                    "level": 0.458346,
+                    "lrPhase": 0.5,
+                    "noteDivision": "off",
+                    "rateHz": 0.08,
+                    "tapTimeBPM": 4.8
+                },
+                "nodeId": "mod",
+                "nodeType": "dspUnit"
+            },
+            {
+                "FenderId": "DUBS_MetalRect2",
+                "dspUnitParameters": {
+                    "bass": 0.857598,
+                    "bias": 0.5,
+                    "cabsimType": "4x12r",
+                    "gain": 0.769145,
+                    "gateDetectorPosition": "jack",
+                    "gatePreset": "super",
+                    "master": 0.380392,
+                    "mid": 0.135629,
+                    "presence": 0.392157,
+                    "sag": "match",
+                    "treb": 0.602199,
+                    "volume": -10.206342
+                },
+                "nodeId": "amp",
+                "nodeType": "dspUnit"
+            },
+            {
+                "FenderId": "DUBS_MonoDelay",
+                "dspUnitParameters": {
+                    "attenuate": 0.5,
+                    "brite": 0,
+                    "bypass": false,
+                    "bypassType": "Pre",
+                    "feedback": 0.144444,
+                    "level": 0.288889,
+                    "noteDivision": "off",
+                    "tapTimeBPM": 126.26387,
+                    "time": 0.475195
+                },
+                "nodeId": "delay",
+                "nodeType": "dspUnit"
+            },
+            {
+                "FenderId": "DUBS_Passthru",
+                "dspUnitParameters": {
+                },
+                "nodeId": "reverb",
+                "nodeType": "dspUnit"
+            }
+        ]
+    },
+    "info": {
+        "author": "",
+        "bpm": 0,
+        "created_at": 0,
+        "displayName": "METAL   LEAD    ",
+        "is_factory_default": true,
+        "preset_id": "82701e3e-caf7-11e7-b721-171e6c7d3090",
+        "product_id": "mustang-lt",
+        "source_id": "",
+        "timestamp": 1510855005
+    },
+    "nodeId": "preset",
+    "nodeType": "preset",
+    "numInputs": 2,
+    "numOutputs": 2,
+    "version": "1.1"
+}
+

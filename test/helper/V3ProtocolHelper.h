@@ -34,11 +34,11 @@ static std::vector<std::uint8_t> readPresetJson(std::string presetFilePath)
 
     while(true)
     {
-        uint8_t nextNonWsByte;
-        presetJson >> std::skipws >> nextNonWsByte;
+        uint8_t nextByte;
+        presetJson >> std::noskipws >> nextByte;
         if(presetJson.good())
         {
-            jsonPayload.push_back(nextNonWsByte);
+            jsonPayload.push_back(nextByte);
         }
         else
         {
@@ -47,8 +47,6 @@ static std::vector<std::uint8_t> readPresetJson(std::string presetFilePath)
         }
     }
     presetJson.close();
-    // If the payload didn't end with a '}', something went wrong
-    assert( jsonPayload.at((jsonPayload.size()-1)) == static_cast<uint8_t>(0x7d) );
 
     return jsonPayload;
 

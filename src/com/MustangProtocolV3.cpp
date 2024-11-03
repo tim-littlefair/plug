@@ -129,7 +129,7 @@ namespace plug::com
         int& response_message_type
     )
     {
-#ifndef NDEBUG
+#if 0 //#ifdef NDEBUG
         std::cout << "Sending " << command_description << ":" << command_hex_bytes << std::endl;
 #endif
         auto command = serializeCommand(command_hex_bytes);
@@ -149,15 +149,7 @@ namespace plug::com
 
         const auto receivedData = receiveResponse((*m_ppConn), true);
 
-#ifndef NDEBUG
-        std::cout << "Received response, packet count: " << receivedData.size() << std::endl;
-#endif
-
         auto response_fields = plug::com::v3::extractResponsePayload_V3_USB(receivedData, response_message_type);
-
-#ifndef NDEBUG
-        std::cout << "Response message type is " << response_message_type << std::endl;
-#endif
 
         return response_fields;
     }

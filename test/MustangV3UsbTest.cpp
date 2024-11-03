@@ -79,26 +79,24 @@ namespace plug::test
         static inline constexpr std::size_t numPresetPackets{200};
         static inline constexpr int slot{5};
 
-        void doRequestForActivePreset()
+        void doRequestForActivePreset(std::string presetFilePath)
         {
             PacketRawType loadCmd = p->serializeCommand("35070800c206020801").getBytes();
             EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
-            std::vector<std::vector<uint8_t>> currentPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"),0);
-            ASSERT_EQ(currentPresetPackets.size(),30);
+            std::vector<std::vector<uint8_t>> currentPresetPackets = presetJsonFileToHIDPackets(presetFilePath,0);
             for(size_t i=0; i<currentPresetPackets.size(); ++i)
             {
                 EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(currentPresetPackets[i]));
             }
         }
 
-        void doRequestsForAllStoredPresets()
+        void doRequestsForAllStoredPresets(std::string presetFilePath)
         {
             for (size_t i=1; i<=m->getDeviceModel().numberOfPresets();++i)
             {
                 PacketRawType presetCmd = p->serializePresetRequestCommand(i).getBytes();
                 EXPECT_CALL(*conn, sendImpl(BufferIs(presetCmd), presetCmd.size())).WillOnce(Return(presetCmd.size()));
-                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string("../../test/data/empty_preset.json"),i);
-                ASSERT_EQ(storedPresetPackets.size(),30);
+                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string(presetFilePath),i);
                 for(size_t j=0; j<storedPresetPackets.size(); ++j)
                 {
                     EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(storedPresetPackets[j]));
@@ -122,8 +120,8 @@ namespace plug::test
         EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-        doRequestForActivePreset();
-        doRequestsForAllStoredPresets();
+        doRequestForActivePreset(std::string("../../test/data/empty_preset.json"));
+        doRequestsForAllStoredPresets(std::string("../../test/data/empty_preset.json"));
 
         m->start_amp();
     }
@@ -149,11 +147,11 @@ namespace plug::test
         EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-        doRequestForActivePreset();
-        doRequestsForAllStoredPresets();
+        doRequestForActivePreset(std::string("../../test/data/empty_preset.json"));
+        doRequestsForAllStoredPresets(std::string("../../test/data/empty_preset.json"));
 
         const auto [signalChain, presets] = m->start_amp();
-        const std::string actualName{"EMPTY"};
+        const std::string actualName{"EMPTY           "};
         EXPECT_THAT(signalChain.name(), StrEq(actualName));
 
         static_cast<void>(presets);
@@ -175,14 +173,14 @@ namespace plug::test
         EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-        doRequestForActivePreset();
-        doRequestsForAllStoredPresets();
+        doRequestForActivePreset(std::string("../../test/data/silky_solo_preset.json"));
+        doRequestsForAllStoredPresets(std::string("../../test/data/silky_solo_preset.json"));
 
         const auto [signalChain, presets] = m->start_amp();
-        const std::string actualName{"EMPTY"};
+        const std::string actualName{"SILKY   SOLO    "};
         EXPECT_THAT(signalChain.name(), StrEq(actualName));
 
-        constexpr amp_settings amp{amps::STUDIO_PREAMP, 5, 0, 5, 5, 5,
+        constexpr amp_settings amp{amps::FENDER_SUPER_SONIC, 3, 5, 7, 7, 7,
                                    cabinets::OFF, 0, 0, 0, 0, 0, 0, 0, 0,
                                    false, 0};
         EXPECT_THAT(signalChain.amp(), AmpIs(amp));
@@ -205,8 +203,8 @@ namespace plug::test
         EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-        doRequestForActivePreset();
-        doRequestsForAllStoredPresets();
+        doRequestForActivePreset(std::string("../../test/data/metal_lead_preset.json"));
+        doRequestsForAllStoredPresets(std::string("../../test/data/metal_lead_preset.json"));
 
         const auto [signalChain, presets] = m->start_amp();
 
