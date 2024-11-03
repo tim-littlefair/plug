@@ -25,11 +25,31 @@
 #include "com/Packet.h"
 
 #include "com/MustangProtocolBase.h"
+#include "com/V3SupportException.h"
 
 #include <algorithm>
 
 namespace plug::com
 {
+
+    static void v3UnsupportedFunctionCheck(DeviceModel model, std::string functionName)
+    {
+        switch (model.category())
+        {
+            case DeviceModel::Category::MustangV1:
+            case DeviceModel::Category::MustangV2:
+                break;
+
+            default:
+                std::string msg = (
+                    "function " +
+                    functionName +
+                    " only supported for Mustang V1 and V2 models"
+                );
+                throw V3SupportException(msg);
+        }
+    }
+
     SignalChain decode_data(const std::array<PacketRawType, 7>& data)
     {
         const auto name = decodeNameFromData(fromRawData<NamePayload>(data[0]));
@@ -103,6 +123,8 @@ namespace plug::com
 
     void Mustang::set_effect(fx_pedal_settings value)
     {
+        v3UnsupportedFunctionCheck(model, std::string("set_effect"));
+
         const auto clearEffectPacket = serializeClearEffectSettings(value);
         sendCommand(*conn, clearEffectPacket.getBytes());
         sendApplyCommand(*conn);
@@ -117,6 +139,8 @@ namespace plug::com
 
     void Mustang::set_amplifier(amp_settings value)
     {
+        v3UnsupportedFunctionCheck(model, std::string("set_amplifier"));
+
         const auto settingsPacket = serializeAmpSettings(value);
         sendCommand(*conn, settingsPacket.getBytes());
         sendApplyCommand(*conn);
@@ -128,6 +152,8 @@ namespace plug::com
 
     void Mustang::save_on_amp(std::string_view name, std::uint8_t slot)
     {
+        v3UnsupportedFunctionCheck(model, std::string("save_on_amp"));
+
         const auto data = serializeName(slot, name).getBytes();
         sendCommand(*conn, data);
         loadBankData(*conn, slot);
@@ -140,6 +166,8 @@ namespace plug::com
 
     void Mustang::save_effects(std::uint8_t slot, std::string_view name, const std::vector<fx_pedal_settings>& effects)
     {
+        v3UnsupportedFunctionCheck(model, std::string("save_effects"));
+
         const auto saveNamePacket = serializeSaveEffectName(slot, name, effects);
         sendCommand(*conn, saveNamePacket.getBytes());
 
@@ -158,39 +186,7 @@ namespace plug::com
 
     InitialData Mustang::loadData()
     {
-#if 0
-        // This block moved to MustangProtocolV1V2::loadPresetData(...)
-
-        std::vector<std::array<std::uint8_t, 64>> recieved_data;
-
-        const auto loadCommand = serializeLoadCommand();
-        auto recieved = conn->send(loadCommand.getBytes());
-
-        while (recieved != 0)
-        {
-            const auto recvData = receivePacket(*conn);
-            recieved = recvData.size();
-            PacketRawType p{};
-            std::copy(recvData.cbegin(), recvData.cend(), p.begin());
-            recieved_data.push_back(p);
-        }
-        const std::size_t numPresetPackets = model.numberOfPresets() > 0 ? (model.numberOfPresets() * 2) : (recieved_data.size() > 143 ? 200 : 48);
-        std::vector<Packet<NamePayload>> presetListData;
-        presetListData.reserve(numPresetPackets);
-        std::transform(recieved_data.cbegin(), std::next(recieved_data.cbegin(), numPresetPackets), std::back_inserter(presetListData), [](const auto& p)
-                       {
-            Packet<NamePayload> packet{};
-            packet.fromBytes(p);
-            return packet; });
-        auto presetNames = decodePresetListFromData(presetListData);
-
-        std::array<PacketRawType, 7> presetData{{}};
-        std::copy(std::next(recieved_data.cbegin(), numPresetPackets), std::next(recieved_data.cbegin(), numPresetPackets + 7), presetData.begin());
-
-        return {decode_data(presetData), presetNames};
-#else
         return pProtocol->loadPresetData(conn);
-#endif
     }
 
     void Mustang::initializeAmp()

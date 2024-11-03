@@ -23,6 +23,7 @@
 #include "com/PacketSerializer.h"
 #include "com/CommunicationException.h"
 #include "com/MustangProtocolV3.h"
+#include "com/V3SupportException.h"
 #include "mocks/MockConnection.h"
 #include "matcher/Matcher.h"
 #include "matcher/TypeMatcher.h"
@@ -216,6 +217,11 @@ namespace plug::test
         constexpr fx_pedal_settings e3{FxSlot{0x03}, effects::TAPE_DELAY, 1, 2, 3, 4, 5, 6};
 #else
         // Values for MustangV3UsbTest based on EMPTY preset
+        // NB as of the current checkin, the JSON parsing is ignoring effects and
+        // always returning the empty set
+        // It is not certain whether the current fork of plug will ever attempt
+        // to be able to save presets back to LT series amps, if they will never
+        // be saved there is no mileage in loading them and supporting editing them.
         constexpr fx_pedal_settings e0{FxSlot{0x00}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
         constexpr fx_pedal_settings e1{FxSlot{0x01}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
         constexpr fx_pedal_settings e2{FxSlot{0x02}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
@@ -322,6 +328,7 @@ namespace plug::test
 
         m->start_amp();
     }
+#endif
 
     TEST_F(MustangV3UsbTest, stopAmpClosesConnection)
     {
@@ -348,9 +355,35 @@ namespace plug::test
             .WillOnce(Return(ignoreData))
             .WillOnce(Return(noData));
 
-
         m->load_memory_bank(slot);
     }
+
+#if 0
+    TEST_F(MustangV3UsbTest, loadMemoryBankAndReceivesNameAndAmpAndPresets)
+    {
+        const auto nameData = asBuffer(serializeName(0, "abc").getBytes());
+
+        InSequence s;
+        // Load cmd
+        EXPECT_CALL(*conn, sendImpl(_, _)).WillOnce(Return(packetRawTypeSize));
+
+        // Data
+        EXPECT_CALL(*conn, receive(packetRawTypeSize))
+            .WillOnce(Return(nameData))
+            .WillOnce(Return(ignoreAmpData))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(noData));
+
+        m->load_memory_bank(slot);
+        const auto signalChain = m->load_memory_bank(slot);
+
+        EXPECT_THAT(signalChain.name(), StrEq("abc"));
+    }
+
 
     TEST_F(MustangV3UsbTest, loadMemoryBankReceivesName)
     {
@@ -437,20 +470,26 @@ namespace plug::test
 
         EXPECT_THAT(signalChain.effects(), ElementsAre(EffectIs(e0), EffectIs(e1), EffectIs(e2), EffectIs(e3)));
     }
+#endif
 
-    TEST_F(MustangV3UsbTest, setAmpSendsValues)
+    TEST_F(MustangV3UsbTest, setAmpSendsValuesNotSupportedForV3)
     {
         constexpr amp_settings settings{amps::BRITISH_70S, 8, 9, 1, 2, 3,
                                         cabinets::cab4x12G, 3, 5, 3, 2, 1,
                                         4, 1, 5, true, 4};
 
-        const auto data = serializeAmpSettings(settings).getBytes();
-        const auto data2 = serializeAmpSettingsUsbGain(settings).getBytes();
 
 
         InSequence s;
+        EXPECT_THROW(m->set_amplifier(settings), V3SupportException);
+
+#if 0 // Original V1/V2 test in case we ever rethink not supporting this command
+
+        const auto data = serializeAmpSettings(settings).getBytes();
+        const auto data2 = serializeAmpSettingsUsbGain(settings).getBytes();
+
         // Data #1
-        EXPECT_CALL(*conn, sendImpl(BufferIs(data), data.size())).WillOnce(Return(data.size()));
+        // EXPECT_CALL(*conn, sendImpl(BufferIs(data), data.size())).WillOnce(Return(data.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
         // Apply command
@@ -465,17 +504,19 @@ namespace plug::test
         EXPECT_CALL(*conn, sendImpl(BufferIs(applyCmd), applyCmd.size())).WillOnce(Return(applyCmd.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-
         m->set_amplifier(settings);
+#endif
     }
 
-    TEST_F(MustangV3UsbTest, setEffectSendsValue)
+    TEST_F(MustangV3UsbTest, setEffectSendsValueNotSupportedForV3)
     {
         constexpr fx_pedal_settings settings{FxSlot{3}, effects::OVERDRIVE, 8, 7, 6, 5, 4, 3};
+        InSequence s;
+        EXPECT_THROW(m->set_effect(settings), V3SupportException);
+
+#if 0
         const auto data = serializeEffectSettings(settings).getBytes();
         const PacketRawType clearEffect = serializeClearEffectSettings(settings).getBytes();
-
-        InSequence s;
 
         // Clear effect command
         EXPECT_CALL(*conn, sendImpl(BufferIs(clearEffect), clearEffect.size())).WillOnce(Return(clearEffect.size()));
@@ -494,14 +535,18 @@ namespace plug::test
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
         m->set_effect(settings);
+#endif
+
     }
 
-    TEST_F(MustangV3UsbTest, setEffectDoesNotSendValueIfDisabled)
+    TEST_F(MustangV3UsbTest, setEffectDoesNotSendValueIfDisabledNotSupportedForV3)
     {
         constexpr fx_pedal_settings settings{FxSlot{3}, effects::OVERDRIVE, 8, 7, 6, 5, 4, 3, false};
-        const PacketRawType clearEffect = serializeClearEffectSettings(settings).getBytes();
-
         InSequence s;
+        EXPECT_THROW(m->set_effect(settings), V3SupportException);
+
+#if 0
+        const PacketRawType clearEffect = serializeClearEffectSettings(settings).getBytes();
 
         // Clear effect command
         EXPECT_CALL(*conn, sendImpl(BufferIs(clearEffect), clearEffect.size())).WillOnce(Return(clearEffect.size()));
@@ -512,15 +557,18 @@ namespace plug::test
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
         m->set_effect(settings);
+#endif
     }
 
-    TEST_F(MustangV3UsbTest, setEffectClearsEffectIfEmptyEffect)
+    TEST_F(MustangV3UsbTest, setEffectClearsEffectIfEmptyEffectNotSupportedForV3)
     {
         constexpr fx_pedal_settings settings{FxSlot{2}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
+        InSequence s;
+        EXPECT_THROW(m->set_effect(settings), V3SupportException);
+#if 0
         const PacketRawType clearCmd = serializeClearEffectSettings(settings).getBytes();
 
 
-        InSequence s;
         // Clear command
         EXPECT_CALL(*conn, sendImpl(BufferIs(clearCmd), clearCmd.size())).WillOnce(Return(clearCmd.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
@@ -531,19 +579,24 @@ namespace plug::test
 
 
         m->set_effect(settings);
+#endif
+
     }
 
-    TEST_F(MustangV3UsbTest, saveEffectsSendsValues)
+    TEST_F(MustangV3UsbTest, saveEffectsSendsValuesNotSupportedForV3)
     {
         const std::vector<fx_pedal_settings> settings{fx_pedal_settings{FxSlot{1}, effects::MONO_DELAY, 0, 1, 2, 3, 4, 5},
                                                       fx_pedal_settings{FxSlot{2}, effects::SINE_FLANGER, 6, 7, 8, 0, 0, 0}};
         const std::string name = "abcd";
+        InSequence s;
+        EXPECT_THROW(m->save_effects(slot, name, settings), V3SupportException);
+
+#if 0
         const auto dataName = serializeSaveEffectName(slot, name, settings).getBytes();
         const auto cmdExecute = serializeApplyCommand(settings[0]).getBytes();
         const auto packets = serializeSaveEffectPacket(slot, settings);
 
 
-        InSequence s;
         // Save effect name cmd
         EXPECT_CALL(*conn, sendImpl(BufferIs(dataName), dataName.size())).WillOnce(Return(0));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(noData));
@@ -564,20 +617,24 @@ namespace plug::test
 
 
         m->save_effects(slot, name, settings);
+#endif
+
     }
 
-    TEST_F(MustangV3UsbTest, saveEffectsLimitsNumberOfValues)
+    TEST_F(MustangV3UsbTest, saveEffectsLimitsNumberOfValuesNotSupportedForV3)
     {
         const std::vector<fx_pedal_settings> settings{fx_pedal_settings{FxSlot{1}, effects::MONO_DELAY, 0, 1, 2, 3, 4, 5},
                                                       fx_pedal_settings{FxSlot{2}, effects::SINE_FLANGER, 6, 7, 8, 0, 0, 0},
                                                       fx_pedal_settings{FxSlot{3}, effects::SINE_FLANGER, 1, 2, 2, 1, 0, 4}};
         const std::string name = "abcd";
+        InSequence s;
+        EXPECT_THROW(m->save_effects(slot, name, settings), V3SupportException);
+
+#if 0
         const auto dataName = serializeSaveEffectName(slot, name, settings).getBytes();
         const auto cmdExecute = serializeApplyCommand(settings[0]).getBytes();
         const auto packets = serializeSaveEffectPacket(slot, settings);
 
-
-        InSequence s;
         // Save effect cmd
         EXPECT_CALL(*conn, sendImpl(BufferIs(dataName), dataName.size())).WillOnce(Return(0));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(noData));
@@ -592,27 +649,32 @@ namespace plug::test
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(noData));
 
         m->save_effects(slot, name, settings);
+#endif
     }
 
-    TEST_F(MustangV3UsbTest, saveEffectsDoesNothingOnInvalidEffect)
+    TEST_F(MustangV3UsbTest, saveEffectsDoesNothingOnInvalidEffectNotSupportedForV3)
     {
         const std::vector<fx_pedal_settings> settings{fx_pedal_settings{FxSlot{1}, effects::COMPRESSOR, 0, 1, 2, 3, 4, 5}};
 
-        EXPECT_THROW(m->save_effects(slot, "abcd", settings), std::invalid_argument);
+        EXPECT_THROW(m->save_effects(slot, "abcd", settings), V3SupportException);
     }
 
     TEST_F(MustangV3UsbTest, saveOnAmp)
     {
         const std::string name(30, 'x');
+        InSequence s;
+        EXPECT_THROW(m->save_on_amp(name, slot), V3SupportException);
+
+#if 0
         const auto saveNamePacket = serializeName(slot, name).getBytes();
         const auto loadSlotCmd = serializeLoadSlotCommand(slot).getBytes();
 
-        InSequence s;
         EXPECT_CALL(*conn, sendImpl(BufferIs(saveNamePacket), saveNamePacket.size())).WillOnce(Return(saveNamePacket.size()));
         EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(noData));
         EXPECT_CALL(*conn, sendImpl(BufferIs(loadSlotCmd), loadSlotCmd.size())).WillOnce(Return(0));
 
         m->save_on_amp(name, slot);
+#endif
     }
 
     TEST_F(MustangV3UsbTest, getDeviceModelReturnsInfos)
@@ -620,8 +682,7 @@ namespace plug::test
         const auto model = m->getDeviceModel();
         EXPECT_THAT(model.name(), Eq("V3 Test Device"));
         EXPECT_THAT(model.category(), Eq(DeviceModel::Category::MustangV3_USB));
-        EXPECT_THAT(model.numberOfPresets(), Eq(100));
+        EXPECT_THAT(model.numberOfPresets(), Eq(60));
     }
-#endif
 
 }
