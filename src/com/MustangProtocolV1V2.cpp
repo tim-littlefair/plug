@@ -48,7 +48,7 @@ namespace plug::com
         return plug::com::serializeLoadCommand();
     }
 
-    InitialData MustangProtocolV1V2::loadData(const std::shared_ptr<Connection> conn)
+    InitialData MustangProtocolV1V2::loadPresetData(const std::shared_ptr<Connection> conn)
     {
         std::vector<std::array<std::uint8_t, 64>> recieved_data;
 
@@ -87,11 +87,6 @@ namespace plug::com
         std::copy(std::next(recieved_data.cbegin(), numPresetPackets), std::next(recieved_data.cbegin(), numPresetPackets + 7), presetData.begin());
 
         return {decode_data(presetData), presetNames};
-    }
-
-    SignalChain MustangProtocolV1V2::load_memory_bank(const std::shared_ptr<Connection> conn, uint8_t slot)
-    {
-        return load_memory_bank(conn, slot);
     }
 }
 

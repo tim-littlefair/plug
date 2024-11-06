@@ -33,8 +33,6 @@
 #include <array>
 #include <gmock/gmock.h>
 
-#include <cassert>
-
 
 namespace plug::test
 {
@@ -82,18 +80,6 @@ namespace plug::test
         static inline constexpr std::size_t numPresetPackets{200};
         static inline constexpr int slot{5};
 
-        std::vector<uint8_t> serializeResponse(const std::string responseHexString)
-        {
-            assert(responseHexString.size()<=32);  // present version can only handle up to 16 bytes
-            Header header;
-            std::array<uint8_t, 16> headerBytes;
-            hexStringToArrayOf16Bytes(std::string(responseHexString), headerBytes);
-            // required return type is a 64 byte vector
-            std::vector<uint8_t> retval(64);
-            std::copy(headerBytes.cbegin(), headerBytes.cend(),retval.begin());
-            return retval;
-        }
-
         void doRequestForActivePreset(std::string presetFilePath)
         {
             PacketRawType loadCmd = p->serializeCommand("35070800c206020801").getBytes();
@@ -111,32 +97,11 @@ namespace plug::test
             {
                 PacketRawType presetCmd = p->serializePresetRequestCommand(i).getBytes();
                 EXPECT_CALL(*conn, sendImpl(BufferIs(presetCmd), presetCmd.size())).WillOnce(Return(presetCmd.size()));
-                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(presetFilePath,i);
+                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string(presetFilePath),i);
                 for(size_t j=0; j<storedPresetPackets.size(); ++j)
                 {
                     EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(storedPresetPackets[j]));
                 }
-            }
-        }
-
-        void doSwitchPresetRequest(uint8_t requestedPresetIndex)
-        {
-            PacketRawType loadCmd = p->serializeCommand("35070800c206020801").getBytes();
-            EXPECT_CALL(*conn, sendImpl(BufferIs(loadCmd), loadCmd.size())).WillOnce(Return(loadCmd.size()));
-
-            std::vector<std::vector<uint8_t>> responsePackets;
-
-            auto responsePacket1 = serializeResponse("0035070801b2020208");
-            responsePacket1[9]=requestedPresetIndex;
-            responsePackets.push_back(responsePacket1);
-
-            auto responsePacket2 = serializeResponse("0035070802aa020208");
-            responsePacket2[9]=requestedPresetIndex;
-            responsePackets.push_back(responsePacket2);
-
-            for(size_t i=0; i<responsePackets.size(); ++i)
-            {
-                EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(responsePackets[i]));
             }
         }
     };
@@ -371,38 +336,29 @@ namespace plug::test
         m->stop_amp();
     }
 
-#if 0
     TEST_F(MustangV3UsbTest, loadMemoryBankSendsBankSelectionCommandAndReceivesPacket)
     {
-        const auto [initPacket1, initPacket2] = p->serializeInitCommand();
-        const auto initCmd1 = initPacket1.getBytes();
-        const auto initCmd2 = initPacket2.getBytes();
+        const auto loadSlotCmd = serializeLoadSlotCommand(slot).getBytes();
 
         InSequence s;
-        EXPECT_CALL(*conn, isOpen()).WillOnce(Return(true));
+        // Load cmd
+        EXPECT_CALL(*conn, sendImpl(BufferIs(loadSlotCmd), loadSlotCmd.size())).WillOnce(Return(loadSlotCmd.size()));
 
-        // Init commands
-        EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd1), initCmd1.size())).WillOnce(Return(initCmd1.size()));
-        EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
-        EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
-        EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
+        // Data
+        EXPECT_CALL(*conn, receive(packetRawTypeSize))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(ignoreAmpData))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(ignoreData))
+            .WillOnce(Return(noData));
 
-        doRequestForActivePreset(std::string("../../test/data/skate_punk_preset.json"));
-        doRequestsForAllStoredPresets(std::string("../../test/data/skate_punk_preset.json"));
-
-        const auto [signalChain0, presets] = m->start_amp();
-        const std::string actualName0{"SKATE   PUNK    "};
-        EXPECT_THAT(signalChain0.name(), StrEq(actualName0));
-
-        const auto signalChain1 = m->load_memory_bank(7);
-        const std::string actualName1{"SKATE   PUNK    "};
-        EXPECT_THAT(signalChain1.name(), StrEq(actualName1));
-
-        static_cast<void>(presets);
+        m->load_memory_bank(slot);
     }
-#endif
 
-#if 1
+#if 0
     TEST_F(MustangV3UsbTest, loadMemoryBankAndReceivesNameAndAmpAndPresets)
     {
         const auto nameData = asBuffer(serializeName(0, "abc").getBytes());

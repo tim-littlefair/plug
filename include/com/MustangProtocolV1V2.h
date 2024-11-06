@@ -44,8 +44,7 @@ namespace plug::com
 
         Packet<EmptyPayload> serializeV1V2LoadCommand();
 
-        InitialData loadData(const std::shared_ptr<Connection> conn);
-        SignalChain load_memory_bank(const std::shared_ptr<Connection> conn, uint8_t slot);
+        InitialData loadPresetData(const std::shared_ptr<Connection> conn);
     };
 }
 

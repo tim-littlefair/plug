@@ -186,7 +186,7 @@ namespace plug::com
 
     InitialData Mustang::loadData()
     {
-        return pProtocol->loadData(conn);
+        return pProtocol->loadPresetData(conn);
     }
 
     void Mustang::initializeAmp()

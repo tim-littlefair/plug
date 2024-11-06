@@ -122,7 +122,7 @@ namespace plug::com::v3
             {
             }
         }
-        static_cast<void>(presetEffects);
+        assert(presetEffects.size()>=1);
     }
 }
 

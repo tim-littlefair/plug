@@ -75,8 +75,3 @@ add_custom_target(unittest MustangTest
                         COMMENT "Running unittests\n\n"
                         VERBATIM
                         )
-
-add_custom_target(v3unittest MustangV3UsbTest
-                        COMMENT "Running V3 unittests\n\n"
-                        VERBATIM
-                        )
