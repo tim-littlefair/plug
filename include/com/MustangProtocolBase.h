@@ -52,7 +52,8 @@ namespace plug::com
         std::vector<std::uint8_t> receivePacket(Connection& conn);
 
         virtual std::array<Packet<EmptyPayload>,2> serializeInitCommand() = 0;
-        virtual InitialData loadPresetData(const std::shared_ptr<Connection> conn) = 0;
+        virtual InitialData loadData(const std::shared_ptr<Connection> conn) = 0;
+        virtual SignalChain load_memory_bank(const std::shared_ptr<Connection> conn, uint8_t slot) = 0;
 
         Packet<EmptyPayload> serializeCommand(const char* hex_bytes);
 
