@@ -39,15 +39,18 @@ namespace plug::com
 
         std::array<Packet<EmptyPayload>,2> serializeInitCommand();
 
-        InitialData loadPresetData(const std::shared_ptr<Connection> conn);
+        InitialData loadData(const std::shared_ptr<Connection> conn);
+        SignalChain load_memory_bank(const std::shared_ptr<Connection> conn, uint8_t slot);
 
         std::vector<std::vector<uint8_t>> sendCommandAndReceiveResponse(
             const char *command_description,
-            const char *command_hex_bytes,
+            std::string command_hex_bytes,
             int& fender_message_type
         );
 
         Packet<EmptyPayload> serializePresetRequestCommand(int presetIndex);
+        Packet<EmptyPayload> serializePresetSwitchCommand(int presetIndex);
+
 
         Packet<EmptyPayload> serializeNextRequestCommand(int index);
     };

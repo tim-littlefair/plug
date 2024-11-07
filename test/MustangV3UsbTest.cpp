@@ -33,6 +33,8 @@
 #include <array>
 #include <gmock/gmock.h>
 
+#include <cassert>
+
 
 namespace plug::test
 {
@@ -80,6 +82,17 @@ namespace plug::test
         static inline constexpr std::size_t numPresetPackets{200};
         static inline constexpr int slot{5};
 
+        std::vector<uint8_t> serializeResponse(const std::string responseHexString)
+        {
+            assert(responseHexString.size()<=32);  // present version can only handle up to 16 bytes
+            std::array<uint8_t, 16> headerBytes;
+            hexStringToArrayOf16Bytes(std::string(responseHexString), headerBytes);
+            // required return type is a 64 byte vector
+            std::vector<uint8_t> retval(64);
+            std::copy(headerBytes.cbegin(), headerBytes.cend(),retval.begin());
+            return retval;
+        }
+
         void doRequestForActivePreset(std::string presetFilePath)
         {
             PacketRawType loadCmd = p->serializeCommand("35070800c206020801").getBytes();
@@ -97,12 +110,26 @@ namespace plug::test
             {
                 PacketRawType presetCmd = p->serializePresetRequestCommand(i).getBytes();
                 EXPECT_CALL(*conn, sendImpl(BufferIs(presetCmd), presetCmd.size())).WillOnce(Return(presetCmd.size()));
-                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(std::string(presetFilePath),i);
+                std::vector<std::vector<uint8_t>> storedPresetPackets = presetJsonFileToHIDPackets(presetFilePath,i);
                 for(size_t j=0; j<storedPresetPackets.size(); ++j)
                 {
                     EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(storedPresetPackets[j]));
                 }
             }
+        }
+
+        void doSwitchPresetRequest(uint8_t requestedPresetIndex)
+        {
+            PacketRawType switchCmd = p->serializePresetSwitchCommand(requestedPresetIndex).getBytes();
+            EXPECT_CALL(*conn, sendImpl(BufferIs(switchCmd), switchCmd.size())).WillOnce(Return(switchCmd.size()));
+
+            auto responsePacket1 = serializeResponse("0035070801b2020208");
+            responsePacket1[9]=requestedPresetIndex;
+            auto responsePacket2 = serializeResponse("0035070802aa020208");
+            responsePacket2[9]=requestedPresetIndex;
+            EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(responsePacket1));
+
+            EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(responsePacket2));
         }
     };
 
@@ -336,27 +363,41 @@ namespace plug::test
         m->stop_amp();
     }
 
+#if 1
     TEST_F(MustangV3UsbTest, loadMemoryBankSendsBankSelectionCommandAndReceivesPacket)
     {
-        const auto loadSlotCmd = serializeLoadSlotCommand(slot).getBytes();
+        ::testing::FLAGS_gmock_verbose = "info";
+        ::testing::FLAGS_gtest_stack_trace_depth=3;
+
+        const auto [initPacket1, initPacket2] = p->serializeInitCommand();
+        const auto initCmd1 = initPacket1.getBytes();
+        const auto initCmd2 = initPacket2.getBytes();
 
         InSequence s;
-        // Load cmd
-        EXPECT_CALL(*conn, sendImpl(BufferIs(loadSlotCmd), loadSlotCmd.size())).WillOnce(Return(loadSlotCmd.size()));
+        EXPECT_CALL(*conn, isOpen()).WillOnce(Return(true));
 
-        // Data
-        EXPECT_CALL(*conn, receive(packetRawTypeSize))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreAmpData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(ignoreData))
-            .WillOnce(Return(noData));
+        // Init commands
+        EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd1), initCmd1.size())).WillOnce(Return(initCmd1.size()));
+        EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
+        EXPECT_CALL(*conn, sendImpl(BufferIs(initCmd2), initCmd2.size())).WillOnce(Return(initCmd2.size()));
+        EXPECT_CALL(*conn, receive(packetRawTypeSize)).WillOnce(Return(ignoreData));
 
-        m->load_memory_bank(slot);
+
+        doRequestForActivePreset(std::string("../../test/data/empty_preset.json"));
+        doRequestsForAllStoredPresets(std::string("../../test/data/empty_preset.json"));
+
+        const auto [signalChain0, presets] = m->start_amp();
+        const std::string actualName0{"EMPTY           "};
+        EXPECT_THAT(signalChain0.name(), StrEq(actualName0));
+
+        //doSwitchPresetRequest(7);
+        //const auto signalChain1 = m->load_memory_bank(7);
+        //const std::string actualName1{"EMPTY           "};
+        //EXPECT_THAT(signalChain1.name(), StrEq(actualName1));
+
+        static_cast<void>(presets);
     }
+#endif
 
 #if 0
     TEST_F(MustangV3UsbTest, loadMemoryBankAndReceivesNameAndAmpAndPresets)

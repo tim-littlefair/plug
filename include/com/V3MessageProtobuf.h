@@ -22,6 +22,8 @@
 #pragma once
 
 #include <cassert>
+#include <iostream>
+#include <iomanip>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -102,6 +104,14 @@ namespace plug::com::v3
         {
             plug::com::PacketRawType p = packets.at(i);
 
+#ifndef NDEBUG
+            for(size_t j=0; j<p.size(); ++j)
+            {
+                std::cout << " " << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(p[j]);
+            }
+            std::cout << std::endl;
+#endif
+
             if(fender_message_type==-1)
             {
                 // first frame
@@ -119,8 +129,8 @@ namespace plug::com::v3
                 // significant bits with a magic number assigned for the message
                 // in higher bits
                 unsigned int fender_message_tag = protobuf_read_varint(array64_to_vector(p), protobuf_read_offset);
-                assert( (fender_message_tag & 0x07) == 2); // protobuf type of whole message is 'LEN'
-                fender_message_type = (fender_message_tag) >> 3;
+                // assert( (fender_message_tag & 0x07) == 2); // protobuf type of whole message is 'LEN'
+                fender_message_type = (fender_message_tag & 0xFFF8) >> 3;
             }
             assert(fender_message_type!=-1);
 

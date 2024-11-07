@@ -57,11 +57,11 @@ namespace plug::com
         return conn.receive(packetRawTypeSize);
     }
 
-    Packet<EmptyPayload> MustangProtocolBase::serializeCommand(const char* command_hex_bytes)
-    {
+    plug::com::Packet< plug::com::EmptyPayload > plug::com::MustangProtocolBase::serializeCommand(std::string hex_bytes)
+{
         Header header;
         std::array<uint8_t, 16> headerBytes;
-        hexStringToArrayOf16Bytes(command_hex_bytes, headerBytes);
+        hexStringToArrayOf16Bytes(hex_bytes, headerBytes);
         header.fromBytes(headerBytes);
         return Packet<EmptyPayload>{header, EmptyPayload{}};
     }
@@ -89,7 +89,11 @@ namespace plug::com
             // with to determine whether the same applies
             // for them but I suspect it will so I'm making
             // this available to both protocols in the base class.
-            if(lastPacketCheck==true && recvData[1]==0x35)
+            if(
+                (lastPacketCheck==true) &&
+                (recvData.size()>0) &&
+                (recvData[1]==0x35)
+            )
             {
                 break;
             }

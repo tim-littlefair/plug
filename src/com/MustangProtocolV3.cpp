@@ -38,13 +38,21 @@
 // definitions of these are at the end of the file, after the namespace closes
 static void debug_dump_hex(std::vector<uint8_t> retval, const std::string& label);
 
+// Stores for the data most recently loaded back from the Mustang device
+static std::vector<std::string> storedPresetNames;
+static std::vector<plug::amp_settings> storedAmpSettings;
+static std::vector<std::vector<plug::fx_pedal_settings>> storedEffects;
+
+
 namespace plug::com
 {
 
     MustangProtocolV3::MustangProtocolV3(DeviceModel model):
     MustangProtocolBase(model)
     {
-
+        storedPresetNames.resize(model.numberOfPresets()+1);
+        storedAmpSettings.resize(model.numberOfPresets()+1);
+        storedEffects.resize(model.numberOfPresets()+1);
     };
 
     std::array<Packet<EmptyPayload>,2> MustangProtocolV3::serializeInitCommand()
@@ -68,12 +76,11 @@ namespace plug::com
         return retval;
     }
 
-    InitialData MustangProtocolV3::loadPresetData(const std::shared_ptr<Connection> conn)
+    InitialData MustangProtocolV3::loadData(const std::shared_ptr<Connection> conn)
     {
         std::string currentPresetName;
-        amp_settings presetAmpSettings;
-        std::vector<std::string> presetNames;
-        std::vector<plug::fx_pedal_settings> presetEffects;
+        amp_settings currentAmpSettings;
+        std::vector<plug::fx_pedal_settings> currentEffects;
 
         v3::populate_reverse_maps();
 
@@ -85,9 +92,9 @@ namespace plug::com
         for(int i=1; i<=4; ++i)
         {
             fx_pedal_settings ps{FxSlot{0}, effects::EMPTY, 0, 0, 0, 0, 0, 0};
-            presetEffects.push_back(ps);
+            currentEffects.push_back(ps);
         }
-        plug::com::v3::parse_preset_json(current_preset_response_bytes[1], "current_preset", currentPresetName, presetAmpSettings, presetEffects);
+        plug::com::v3::parse_preset_json(current_preset_response_bytes[1], "current_preset", currentPresetName, currentAmpSettings, currentEffects);
         assert(current_preset_response_bytes.size()==3);
         assert(current_preset_response_bytes[2].size()==4);
         assert(current_preset_response_bytes[2][0]==0x10);
@@ -96,8 +103,6 @@ namespace plug::com
 
         for(int i=1; i<=60; ++i)
         {
-            std::string storedPresetName;
-
             std::ostringstream presetFilenameStr;
             presetFilenameStr << "preset_" << std::setfill('0') << std::setw(2) << i << std::ends;
             std::string presetFilename = presetFilenameStr.str();
@@ -111,28 +116,63 @@ namespace plug::com
                 storedPresetRequest.c_str(),
                 response_type_received
             );
-            plug::com::v3::parse_preset_json(stored_preset_response_bytes[1], presetFilename.c_str(), storedPresetName, presetAmpSettings, presetEffects);
+            plug::com::v3::parse_preset_json(
+                stored_preset_response_bytes[1],
+                presetFilename.c_str(),
+                storedPresetNames[i], storedAmpSettings[i], storedEffects[i]
+            );
 
             debug_dump_hex(current_preset_response_bytes[0],presetFilename.c_str());
-            presetNames.push_back(storedPresetName);
         }
 
 
         m_ppConn = NULL;
 
-        return InitialData{SignalChain{currentPresetName, presetAmpSettings, presetEffects},presetNames};
+        return InitialData{SignalChain{currentPresetName, currentAmpSettings, currentEffects},storedPresetNames};
     }
+
+    SignalChain MustangProtocolV3::load_memory_bank(const std::shared_ptr<Connection> conn, uint8_t slot)
+    {
+        m_ppConn = &conn;
+
+        std::ostringstream switchToPresetFilenameStr;
+        switchToPresetFilenameStr << "switch_to_preset_" << std::setfill('0') << std::setw(2) << slot << std::ends;
+        std::string switchToPresetFilename = switchToPresetFilenameStr.str();
+
+        std::ostringstream switchToPresetRequestStr;
+        switchToPresetRequestStr << "350708008a020208" << std::setfill('0') << std::setw(2) << std::hex << slot << std::ends;
+        std::string switchToPresetRequest = switchToPresetRequestStr.str();
+
+        int response_type_received;
+        std::vector<std::vector<uint8_t>> switch_preset_response1_bytes = sendCommandAndReceiveResponse(
+            switchToPresetFilename.c_str(), switchToPresetRequest, response_type_received
+        );
+
+        // We expect to receive two messages back.
+        // The first will have beem returned by sendCommandAndReceiveResponse
+        assert(response_type_received==38);
+
+        // We do an additional receive for the second message
+        //const auto receivedData = receiveResponse((*m_ppConn), true);
+        //auto response_fields = plug::com::v3::extractResponsePayload_V3_USB(receivedData, response_type_received);
+        //assert(response_type_received==37);
+
+        m_ppConn = NULL;
+
+        return SignalChain{storedPresetNames[slot], storedAmpSettings[slot], storedEffects[slot]};
+    }
+
 
     std::vector<std::vector<uint8_t>> MustangProtocolV3::sendCommandAndReceiveResponse(
         const char *command_description,
-        const char *command_hex_bytes,
+        std::string command_hex_bytes,
         int& response_message_type
     )
     {
-#if 0 //#ifdef NDEBUG
+#ifdef NDEBUG
         std::cout << "Sending " << command_description << ":" << command_hex_bytes << std::endl;
 #endif
-        auto command = serializeCommand(command_hex_bytes);
+        auto command = serializeCommand(command_hex_bytes.c_str());
 
         auto recieved = (*m_ppConn)->send(command.getBytes());
 
@@ -144,7 +184,10 @@ namespace plug::com
                 "Empty response to %s request",
                 command_description
             );
-            throw CommunicationException(std::string(exception_message));
+#ifdef NDEBUG
+            std::cout << exception_message << std::endl;
+#endif
+            // throw CommunicationException(std::string(exception_message));
         }
 
         const auto receivedData = receiveResponse((*m_ppConn), true);
@@ -161,6 +204,18 @@ namespace plug::com
         Packet<EmptyPayload> retval;
         Header header2{};
         std::string hexBytes2("35070800ca060208010110");
+        std::array<uint8_t, 16> header2Bytes;
+        hexStringToArrayOf16Bytes(hexBytes2, header2Bytes);
+        header2Bytes[8] = presetIndex;
+        header2.fromBytes(header2Bytes);
+        return Packet<EmptyPayload>{header2, EmptyPayload{}};
+    }
+
+    Packet<EmptyPayload> MustangProtocolV3::serializePresetSwitchCommand(int presetIndex)
+    {
+        Packet<EmptyPayload> retval;
+        Header header2{};
+        std::string hexBytes2("350708008a020208");
         std::array<uint8_t, 16> header2Bytes;
         hexStringToArrayOf16Bytes(hexBytes2, header2Bytes);
         header2Bytes[8] = presetIndex;

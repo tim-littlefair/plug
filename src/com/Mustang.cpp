@@ -161,7 +161,11 @@ namespace plug::com
 
     SignalChain Mustang::load_memory_bank(std::uint8_t slot)
     {
-        return decode_data(loadBankData(*conn, slot));
+        SignalChain retval = pProtocol->load_memory_bank(conn, slot);
+#ifndef NDEBUG
+        std::cout << "loaded_memory_bank returned" << std::endl;
+#endif
+        return retval;
     }
 
     void Mustang::save_effects(std::uint8_t slot, std::string_view name, const std::vector<fx_pedal_settings>& effects)
@@ -186,7 +190,7 @@ namespace plug::com
 
     InitialData Mustang::loadData()
     {
-        return pProtocol->loadPresetData(conn);
+        return pProtocol->loadData(conn);
     }
 
     void Mustang::initializeAmp()
