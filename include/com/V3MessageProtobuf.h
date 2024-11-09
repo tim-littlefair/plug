@@ -28,8 +28,13 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 
+// Accessors for a static verbosity element defined in MustangProtocolV3Usb.cpp
+void set_v3_protocol_debug_verbosity(int v);
+int get_v3_protocol_debug_verbosity();
+
 namespace plug::com::v3
 {
+
     static std::vector<uint8_t> array64_to_vector(std::array<uint8_t,64> a)
     {
         std::vector<uint8_t> v;
@@ -105,11 +110,14 @@ namespace plug::com::v3
             plug::com::PacketRawType p = packets.at(i);
 
 #ifndef NDEBUG
-            for(size_t j=0; j<p.size(); ++j)
+            if (get_v3_protocol_debug_verbosity()>0)
             {
-                std::cout << " " << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(p[j]);
+                for(size_t j=0; j<p.size(); ++j)
+                {
+                    std::cout << " " << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(p[j]);
+                }
+                std::cout << std::endl;
             }
-            std::cout << std::endl;
 #endif
 
             if(fender_message_type==-1)
@@ -121,7 +129,7 @@ namespace plug::com::v3
                 // https://protobuf.dev/programming-guides/encoding/#structure
                 // for information about protobuf types and their encoding
                 assert(p[3]==0x08); // magic number for protobuf
-                assert(p[4]==0x02); // always protobuf v2
+                // assert(p[4]==0x02); // USUALLY protobuf v2 but not always!!!
                 protobuf_read_offset = 5;
                 // protobuf requires that the next item in the stream is the
                 // 'tag' of the message structure, which is a variable-length-encoded integer
@@ -143,13 +151,15 @@ namespace plug::com::v3
                 std::back_inserter(retval[0])
             );
         }
+
+#ifndef NDEBUG
         std::ofstream raw_dump_stream("response.raw");
         for (size_t i = 0; i<retval[0].size(); ++i)
         {
             raw_dump_stream << static_cast<char>(retval[0][i]);
         }
         raw_dump_stream.close();
-
+#endif
         switch (fender_message_type)
         {
             // Refer to:
