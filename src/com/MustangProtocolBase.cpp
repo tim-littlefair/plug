@@ -58,7 +58,7 @@ namespace plug::com
     }
 
     plug::com::Packet< plug::com::EmptyPayload > plug::com::MustangProtocolBase::serializeCommand(std::string hex_bytes)
-    {
+{
         Header header;
         std::array<uint8_t, 16> headerBytes;
         hexStringToArrayOf16Bytes(hex_bytes, headerBytes);
@@ -117,16 +117,9 @@ namespace plug::com
         }
     }
 
-    void hexStringToArrayOf16Bytes(std::string inHexString, std::array<uint8_t,16>& outByteArray)
+    void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outByteArray)
     {
-        if( (inHexString.length()%2) != 0 )
-        {
-            std::cout << "Attempt to convert '" << inHexString << "' to an array of bytes" << std::endl;
-            std::cout << "length: " << inHexString.length() << " last byte: " << static_cast<unsigned int>(inHexString.at(inHexString.length() - 1)) << std::endl;
-            // brute force:
-            inHexString.resize(inHexString.length()-1);
-        }
-        assert( (inHexString.length()%2) == 0 );
+        assert(inHexString.length()%2==0);
 
         for (size_t i = 0; i<sizeof(outByteArray); ++i)
         {

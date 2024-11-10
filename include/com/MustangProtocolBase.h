@@ -62,7 +62,7 @@ namespace plug::com
         );
     };
 
-    void hexStringToArrayOf16Bytes(std::string inHexString, std::array<uint8_t,16>& outByteArray);
+    void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outByteArray);
 }
 
 

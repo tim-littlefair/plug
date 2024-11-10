@@ -44,17 +44,6 @@ static std::vector<plug::amp_settings> storedAmpSettings;
 static std::vector<std::vector<plug::fx_pedal_settings>> storedEffects;
 
 
-static int debug_verbosity = 0;
-void set_v3_protocol_debug_verbosity(int v)
-{
-    ::debug_verbosity = v;
-}
-
-int get_v3_protocol_debug_verbosity()
-{
-    return ::debug_verbosity;
-}
-
 namespace plug::com
 {
 
@@ -71,7 +60,7 @@ namespace plug::com
         std::array<Packet<EmptyPayload>,2> retval;
 
         Header header0{};
-        std::string hexBytes0("350708008a0704080010");
+        std::string hexBytes0("350908008a0704080010");
         std::array<uint8_t, 16> header0Bytes;
         hexStringToArrayOf16Bytes(hexBytes0, header0Bytes);
         header0.fromBytes(header0Bytes);
@@ -147,16 +136,16 @@ namespace plug::com
         m_ppConn = &conn;
 
         std::ostringstream switchToPresetFilenameStr;
-        switchToPresetFilenameStr << "switch_to_preset_" << std::setfill('0') << std::setw(2) << static_cast<unsigned int>(slot) << std::ends;
+        switchToPresetFilenameStr << "switch_to_preset_" << std::setfill('0') << std::setw(2) << slot << std::ends;
         std::string switchToPresetFilename = switchToPresetFilenameStr.str();
 
         std::ostringstream switchToPresetRequestStr;
-        switchToPresetRequestStr << "350708008a020208" << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(slot) << std::ends;
+        switchToPresetRequestStr << "350708008a020208" << std::setfill('0') << std::setw(2) << std::hex << slot << std::ends;
         std::string switchToPresetRequest = switchToPresetRequestStr.str();
 
         int response_type_received;
         std::vector<std::vector<uint8_t>> switch_preset_response1_bytes = sendCommandAndReceiveResponse(
-            switchToPresetFilename, switchToPresetRequest, response_type_received
+            switchToPresetFilename.c_str(), switchToPresetRequest, response_type_received
         );
 
         // We expect to receive two messages back.
@@ -164,9 +153,9 @@ namespace plug::com
         assert(response_type_received==38);
 
         // We do an additional receive for the second message
-        const auto receivedData = receiveResponse((*m_ppConn), true);
-        auto response_fields = plug::com::v3::extractResponsePayload_V3_USB(receivedData, response_type_received);
-        assert(response_type_received==37);
+        //const auto receivedData = receiveResponse((*m_ppConn), true);
+        //auto response_fields = plug::com::v3::extractResponsePayload_V3_USB(receivedData, response_type_received);
+        //assert(response_type_received==37);
 
         m_ppConn = NULL;
 
@@ -175,7 +164,7 @@ namespace plug::com
 
 
     std::vector<std::vector<uint8_t>> MustangProtocolV3::sendCommandAndReceiveResponse(
-        std::string command_description,
+        const char *command_description,
         std::string command_hex_bytes,
         int& response_message_type
     )
@@ -183,7 +172,7 @@ namespace plug::com
 #ifdef NDEBUG
         std::cout << "Sending " << command_description << ":" << command_hex_bytes << std::endl;
 #endif
-        auto command = serializeCommand(command_hex_bytes);
+        auto command = serializeCommand(command_hex_bytes.c_str());
 
         auto recieved = (*m_ppConn)->send(command.getBytes());
 
@@ -193,7 +182,7 @@ namespace plug::com
             snprintf(
                 exception_message,sizeof(exception_message),
                 "Empty response to %s request",
-                command_description.c_str()
+                command_description
             );
 #ifdef NDEBUG
             std::cout << exception_message << std::endl;

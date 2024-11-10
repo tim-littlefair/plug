@@ -43,7 +43,7 @@ namespace plug::com
         SignalChain load_memory_bank(const std::shared_ptr<Connection> conn, uint8_t slot);
 
         std::vector<std::vector<uint8_t>> sendCommandAndReceiveResponse(
-            std::string command_description,
+            const char *command_description,
             std::string command_hex_bytes,
             int& fender_message_type
         );
