@@ -1,0 +1,22 @@
+# udev rules for Fender Mustang Amps. Used by Plug.
+
+ACTION!="add|bind", GOTO="mustang_plug_rules_end"
+SUBSYSTEM!="usb", GOTO="mustang_plug_rules_end"
+
+ATTRS{idVendor}=="1ed8", ATTRS{idProduct}=="0037", ENV{ID_AUDIO_MODELING_AMP}="1" # Mustang LT25
+ATTRS{idVendor}=="1ed8", ATTRS{idProduct}=="0038", ENV{ID_AUDIO_MODELING_AMP}="1" # Rumble LT25
+ATTRS{idVendor}=="1ed8", ATTRS{idProduct}=="0046", ENV{ID_AUDIO_MODELING_AMP}="1" # Mustang LT40S
+
+# TBD - Mustang LT50
+# TBD - Mustang GT/GTX series
+# TBD - Mustang Micro, Mustang Micro Plus
+
+# If we never expect FMIC to use their vendor id on anything but a modelling
+# amplifier it is safe to uncomment this so we don't need to discover product
+# id's for individual devices and add them here
+# Apps can still check the product id returned when a device is detected and
+# decide whether/how to interact with it.
+
+ATTRS{idVendor}=="1ed8", ENV{ID_AUDIO_MODELING_AMP}="1"
+
+LABEL="mustang_plug_rules_end"

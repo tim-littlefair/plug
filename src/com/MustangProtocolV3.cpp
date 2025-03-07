@@ -134,13 +134,14 @@ namespace plug::com
     SignalChain MustangProtocolV3::load_memory_bank(const std::shared_ptr<Connection> conn, uint8_t slot)
     {
         m_ppConn = &conn;
+        int slotAsInt = 0xff  & static_cast<int>(slot);
 
         std::ostringstream switchToPresetFilenameStr;
-        switchToPresetFilenameStr << "switch_to_preset_" << std::setfill('0') << std::setw(2) << slot << std::ends;
+        switchToPresetFilenameStr << "switch_to_preset_" << std::setfill('0') << std::setw(2) << slotAsInt << std::ends;
         std::string switchToPresetFilename = switchToPresetFilenameStr.str();
 
         std::ostringstream switchToPresetRequestStr;
-        switchToPresetRequestStr << "350708008a020208" << std::setfill('0') << std::setw(2) << std::hex << slot << std::ends;
+        switchToPresetRequestStr << "350708008a020208" << std::setfill('0') << std::setw(2) << std::hex << slotAsInt << std::ends;
         std::string switchToPresetRequest = switchToPresetRequestStr.str();
 
         int response_type_received;
@@ -148,14 +149,21 @@ namespace plug::com
             switchToPresetFilename.c_str(), switchToPresetRequest, response_type_received
         );
 
+
         // We expect to receive two messages back.
         // The first will have beem returned by sendCommandAndReceiveResponse
-        assert(response_type_received==38);
+        // assert(response_type_received==38);
+#ifndef NDEBUG
+        std::cout << "Received first response of type " << response_type_received << std::endl;
+#endif
 
         // We do an additional receive for the second message
-        //const auto receivedData = receiveResponse((*m_ppConn), true);
-        //auto response_fields = plug::com::v3::extractResponsePayload_V3_USB(receivedData, response_type_received);
+        const auto receivedData = receiveResponse((*m_ppConn), true);
+        auto response_fields = plug::com::v3::extractResponsePayload_V3_USB(receivedData, response_type_received);
         //assert(response_type_received==37);
+#ifndef NDEBUG
+        std::cout << "Received second response of type " << response_type_received << std::endl;
+#endif
 
         m_ppConn = NULL;
 
@@ -169,8 +177,8 @@ namespace plug::com
         int& response_message_type
     )
     {
-#ifdef NDEBUG
-        std::cout << "Sending " << command_description << ":" << command_hex_bytes << std::endl;
+#ifndef NDEBUG
+        std::cout << "Sending " << command_description << ":" << command_hex_bytes.c_str() << std::endl;
 #endif
         auto command = serializeCommand(command_hex_bytes.c_str());
 
@@ -184,7 +192,7 @@ namespace plug::com
                 "Empty response to %s request",
                 command_description
             );
-#ifdef NDEBUG
+#ifndef NDEBUG
             std::cout << exception_message << std::endl;
 #endif
             // throw CommunicationException(std::string(exception_message));

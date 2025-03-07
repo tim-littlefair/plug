@@ -58,7 +58,7 @@ namespace plug::com
     }
 
     plug::com::Packet< plug::com::EmptyPayload > plug::com::MustangProtocolBase::serializeCommand(std::string hex_bytes)
-{
+    {
         Header header;
         std::array<uint8_t, 16> headerBytes;
         hexStringToArrayOf16Bytes(hex_bytes, headerBytes);
@@ -119,6 +119,12 @@ namespace plug::com
 
     void hexStringToArrayOf16Bytes(const std::string& inHexString, std::array<uint8_t,16>& outByteArray)
     {
+#ifndef NDEBUG
+        if (inHexString.length()%2!=0)
+        {
+            std::cerr << "MPB::hSTAO16B: inHexString length=" << inHexString.length() << " value=" << inHexString.c_str() << std::endl;
+        }
+#endif
         assert(inHexString.length()%2==0);
 
         for (size_t i = 0; i<sizeof(outByteArray); ++i)

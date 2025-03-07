@@ -114,6 +114,10 @@ namespace plug::com::v3
 
             if(fender_message_type==-1)
             {
+                if (p[3]==0x00) {
+                    // Most likely an empty buffer returned after a timeout
+                    continue;
+                }
                 // first frame
                 // May or may not be the last frame too
 
