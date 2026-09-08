@@ -593,6 +593,11 @@ namespace plug
         {
             amp->send_amp();
         }
+        
+        // std::string ampName = Amplifier::getAmpName(fileSettings.amp.)
+        QString amp_name = QString::fromStdString(amp_name_for_plug_id(fileSettings.amp.amp_num));
+        QString ampButtonText = QString("&Amplifier:\n") + amp_name;
+        ui->Amplifier->setText(ampButtonText);
 
         const bool shouldPopup = settings.value("Settings/popupChangedWindows").toBool();
 
@@ -615,6 +620,7 @@ namespace plug
             {
                 component->show();
             } });
+        repaint();
     }
 
     void MainWindow::get_settings(amp_settings* amplifier_settings, std::vector<fx_pedal_settings>& fx_settings)

@@ -26,29 +26,10 @@
 #include <QSettings>
 #include <QShortcut>
 
+#include "effects_enum.h"
+
 namespace plug
 {
-    namespace
-    {
-        const std::map<amps, std::string> ampNames{
-            {amps::FENDER_57_DELUXE, "Fender '57 Deluxe"},
-            {amps::FENDER_59_BASSMAN, "Fender '59 Bassman"},
-            {amps::FENDER_57_CHAMP, "Fender '57 Champ"},
-            {amps::FENDER_65_DELUXE_REVERB, "Fender '65 Deluxe Reverb"},
-            {amps::FENDER_65_PRINCETON, "Fender '65 Princeton"},
-            {amps::FENDER_65_TWIN_REVERB, "Fender '65 Twin Reverb"},
-            {amps::FENDER_SUPER_SONIC, "Fender Super-Sonic"},
-            {amps::BRITISH_60S, "British 60's"},
-            {amps::BRITISH_70S, "British 70's"},
-            {amps::BRITISH_80S, "British 80's"},
-            {amps::AMERICAN_90S, "American 90's"},
-            {amps::METAL_2000, "Metal 2000"},
-            {amps::STUDIO_PREAMP, "Studio Preamp"},
-            {amps::FENDER_57_TWIN, "Fender '57 Twin"},
-            {amps::FENDER_60_THRIFT, "Fender '60s Thrift"},
-            {amps::BRITISH_COLOUR, "British Colour"},
-            {amps::BRITISH_WATTS, "British Watts"}};
-    }
 
     Amplifier::Amplifier(QWidget* parent)
         : QMainWindow(parent),
@@ -102,10 +83,12 @@ namespace plug
 
     void Amplifier::setDeviceModel(DeviceModel model)
     {
-        std::for_each(ampNames.cbegin(), ampNames.cend(), [this, model](const auto& item)
-                      {
-                if (!isV2Amp(item.first) || (isV2Amp(item.first) && model.category() == DeviceModel::Category::MustangV2)){
-                ui->comboBox->addItem(QString::fromStdString(item.second));} });
+        std::list<std::string> ampNamesForModel;
+        populate_amp_name_list(&model, ampNamesForModel);
+        std::for_each(ampNamesForModel.cbegin(), ampNamesForModel.cend(), [this, model](const auto& item)
+        {
+            ui->comboBox->addItem(QString::fromStdString(item));
+        });
     }
 
     void Amplifier::set_gain(int value)
@@ -208,8 +191,9 @@ namespace plug
     {
         amp_num = static_cast<amps>(ampValue);
         changed = true;
+        QString amp_name = QString::fromStdString(amp_name_for_plug_id(amp_num));
 
-        const QString title = QStringLiteral("Amplifier: %1").arg(QString::fromStdString(ampNames.at(amp_num)));
+        const QString title = QStringLiteral("Amplifier: %1").arg(amp_name);
         setWindowTitle(title);
         setAccessibleName(title);
 

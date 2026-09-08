@@ -26,6 +26,7 @@
 #include "DeviceModel.h"
 #include <QMainWindow>
 #include <memory>
+#include <string>
 
 namespace Ui
 {

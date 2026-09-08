@@ -22,6 +22,10 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <list>
+
+#include <DeviceModel.h>
 
 namespace plug
 {
@@ -177,4 +181,7 @@ namespace plug
         return static_cast<std::uint8_t>(c);
     }
 
+    void populate_amp_name_list(DeviceModel *pDeviceModel, std::list<std::string> &amp_name_list);
+    
+    std::string amp_name_for_plug_id(amps plug_id);
 }
